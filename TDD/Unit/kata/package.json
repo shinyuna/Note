@@ -1,0 +1,15 @@
+{
+  "name": "tdd-unit-kata",
+  "version": "1.0.0",
+  "description": "training unit testing",
+  "main": "add.js",
+  "scripts": {
+    "test": "jest --watch"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/jest": "^27.4.1",
+    "jest": "^27.5.1"
+  }
+}
