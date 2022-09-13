@@ -1,0 +1,17 @@
+[
+  {
+    "id": 1,
+    "name": "우유",
+    "status": "ready"
+  },
+  {
+    "id": 2,
+    "name": "사과",
+    "status": "not-ready"
+  },
+  {
+    "id": 3,
+    "name": "바나나",
+    "status": "ready"
+  }
+]
