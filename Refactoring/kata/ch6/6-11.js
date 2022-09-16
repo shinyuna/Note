@@ -1,16 +1,39 @@
-export function priceOrder(product, quantity, shippingMethod) {
-  const basePrice = product.basePrice * quantity;
-  const discount =
-    Math.max(quantity - product.discountThreshold, 0) *
-    product.basePrice *
-    product.discountRate;
-  const shippingPerCase =
-    basePrice > shippingMethod.discountThreshold
-      ? shippingMethod.discountedFee
-      : shippingMethod.feePerCase;
-  const shippingCost = quantity * shippingPerCase;
-  const price = basePrice - discount + shippingCost;
-  return price;
+/**
+ * 긴 함수는 각 단계별로 쪼개 함수로 만든다.
+ * - 함수가 어떤 작업을 하고 있는지 명확히게 파악할 수 있다.
+ * - 한 눈에 봐도 알아보기 좋은 코드는 인라인 해도 괜찮다. 하지만, 여러번 반복되면 함수로 추출한다.
+ */
+
+export class Order {
+  #product;
+  #shippingMethod;
+  constructor(product, quantity, shippingMethod) {
+    this.#product = product;
+    this.quantity = quantity;
+    this.#shippingMethod = shippingMethod;
+  }
+
+  get basePrice() {
+    return this.#product.basePrice * this.quantity; // 상품 가격과 수량
+  }
+
+  get discount() {
+    return Math.max(this.quantity - this.#product.discountThreshold, 0) * this.basePrice * this.#product.discountRate;
+  }
+
+  get shippingPerCase() {
+    return this.basePrice > this.#shippingMethod.discountThreshold
+      ? this.#shippingMethod.discountedFee
+      : this.#shippingMethod.feePerCase;
+  }
+
+  get shippingCost() {
+    return this.quantity * this.shippingPerCase; // 배송비
+  }
+
+  get price() {
+    return this.basePrice - this.discount + this.shippingCost;
+  }
 }
 
 // 사용 예:
@@ -26,5 +49,5 @@ const shippingMethod = {
   discountedFee: 3,
 };
 
-const price = priceOrder(product, 5, shippingMethod);
-console.log(price);
+const price = new Order(product, 5, shippingMethod).price;
+console.log('🚀 ~ price', price);
