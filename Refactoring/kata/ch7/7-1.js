@@ -1,3 +1,4 @@
+import _ from 'lodash';
 /**
  * 해결 방법: 레코드를 클래스로 만들어 캡슐화 한다.
  *
@@ -8,11 +9,13 @@
  */
 
 class Organization {
+  #data;
   #name;
   #country;
-  constructor(name, country) {
-    this.#name = name
-    this.#country = country
+  constructor(data) {
+    this.#data = data
+    this.#name = data.name
+    this.#country = data.country
   }
 
   get name() {
@@ -20,16 +23,29 @@ class Organization {
   }
 
   get country() {
-    return this.#country;
+    return this.#country
   }
 
-  set name(name) {
-    this.#name = name
+  set name(value) {
+    if (!value) {
+      return;
+    }
+    this.#name = value
+  }
+
+  get originData() {
+    // return {...this.#data} // <- 얕은 복사
+    return _.cloneDeep(this.#data)
+  }
+
+  get rowData() {
+    return { name: this.name, country: this.#country }
   }
 }
 
-const organization = new Organization('Acme Gooseberries', 'GB')
+const organization = new Organization({ name: 'Acme Gooseberries', country: 'GB' })
 
-organization.name = 'Dream Coding';
-console.log(organization.name);
-console.log(organization.country);
+organization.name = '';
+console.log(organization.name)
+console.log(organization.originData);
+console.log(organization.rowData);
