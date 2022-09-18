@@ -1,4 +1,10 @@
-let appliesToMass = false;
-for (const s of states) {
-  if (s === 'MA') appliesToMass = true;
-}
+/**
+ * 기본적인 코드 테크닉
+ *
+ * [잔소리 타임]
+ * - 유능한 개발자는 ?
+ * 1. 본인이 사용하는 툴을 익숙하게 잘 사용해야한다.
+ * 2. 플랫폼에 대한 이해도가 높아야한다.
+ * - 상황에 알맞는 메서드, 라이브러리, API 등을 손 쉽게 찾고 사용 가능해야한다.
+ */
+let appliesToMass = states.includes('MA')
