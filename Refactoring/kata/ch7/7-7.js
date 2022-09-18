@@ -1,3 +1,14 @@
+/**
+ * [문제]
+ *  내부적으로 사용하는 데이터를 외부에 지나치게 노출한다.
+ *
+ * [해결]
+ *  외부에선 어떤 데이터에 접근해서 가져오는지 알 수 없도록 한다. -> 위임 숨기기
+ *  ex. "이 사람의 매니저가 누구얏!!"
+ *  ---> 이 백화점의 이 매니져요 X
+ *  ---> 이 매니저요 O
+ */
+
 class Person {
   #name;
   #department;
@@ -10,13 +21,18 @@ class Person {
     return this.#name;
   }
 
-  get department() {
-    return this.#department;
-  }
-
   set department(arg) {
     this.#department = arg;
   }
+
+  get chargeCode() {
+    return this.#department.chargeCode;
+  }
+
+  get manager() {
+    return this.#department.manager
+  }
+
 }
 
 export class Department {
@@ -46,5 +62,5 @@ export class Department {
 
 const person = new Person('Tom', new Department('aManager', '999'));
 console.log(person.name);
-console.log(person.department.manager);
-console.log(person.department.chargeCode);
+console.log(person.manager);
+console.log(person.chargeCode);
