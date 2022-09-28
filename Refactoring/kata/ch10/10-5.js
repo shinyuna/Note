@@ -1,3 +1,10 @@
+/**
+ * :NOTE
+ * - 객체 지향을 공부할 땐 혼자 객체를 상상하면서 연습하는 편 - 앨리
+ * - 비어 있는 값을 나타낼 땐 null 보단, 비어 있는 값이라는 것을 나타내는 특이 케이스 객체를 추가하는 편이 좋다.
+ * -> 다형성, 유지보수성, 확장
+ * ->
+ */
 export class Site {
   constructor(customer) {
     this._customer = customer;

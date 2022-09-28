@@ -1,5 +1,6 @@
 /**
  * :NOTE
+ * - 웹스톰에서 class 메서드 추가는 Cmd+N
  *
  * [문제점]
  * - 코드의 의도를 한 눈에 파악하기 어렵다.
@@ -22,4 +23,35 @@ function calculateCharge(date, quantity, plan) {
   }
 
   return isSummer ? summerCharge() : regularCharge();
+}
+
+class Charge {
+  #date
+  #quantity
+  #plan
+
+  get plan() {
+    return this.#plan;
+  }
+
+  set plan(value) {
+    this.#plan = value;
+  }
+
+  get quantity() {
+    return this.#quantity;
+  }
+
+  set quantity(value) {
+    this.#quantity = value;
+  }
+
+  get date() {
+    return this.#date;
+  }
+
+  set date(value) {
+    this.#date = value;
+  }
+
 }

@@ -1,3 +1,10 @@
+/**
+ *
+ * :NOTE
+ * - 조건부 로직은 다형성으로 바꿀 때 가장 중요한 것은 추상화. 코드에서 중복적으로 사용되는 로직이 무엇인지 판단하고 조건에 따라 다른 부분은 상속 후 오버라이딩.
+ * - 개발을 하다보면 상속보단 합성을 하는 것이 더 나을 때가 있는데 이것은 많은 경험 끝에서 스스로 느껴봐야 한다.
+ */
+
 export function rating(voyage, history) {
   // 투자 등급
   const vpf = voyageProfitFactor(voyage, history);
