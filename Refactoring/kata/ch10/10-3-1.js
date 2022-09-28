@@ -1,20 +1,19 @@
+/**
+ * [문제]
+ * - 하나만 있어도 읽기 어려운 조건문이 중첩으로 되어 있다. 😵
+ * - **보호 구문** : 조건이 비정상이면 함수 밖으로 빠져 나온다.
+ */
+
 export function payAmount(employee) {
-  let result;
   if (employee.isSeparated) {
-    result = { amount: 0, reasonCode: 'SEP' };
-  } else {
-    if (employee.isRetired) {
-      result = { amount: 0, reasonCode: 'RET' };
-    } else {
-      // lorem.ipsum(dolor.sitAmet);
-      // consectetur(adipiscing).elit();
-      // sed.do.eiusmod = tempor.incididunt.ut(labore) && dolore(magna.aliqua);
-      // ut.enim.ad(minim.veniam);
-      result = someFinalComputation();
-      return result;
-    }
+    return  { amount: 0, reasonCode: 'SEP' };
   }
-  return result;
+
+  if (employee.isRetired) {
+    return { amount: 0, reasonCode: 'RET' };
+  }
+
+  return someFinalComputation();
 }
 
 function someFinalComputation() {
