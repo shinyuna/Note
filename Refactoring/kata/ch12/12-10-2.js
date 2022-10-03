@@ -14,44 +14,46 @@ class Bird {
   }
 
   get plumage() {
-    if (this._specialDelegate) {
-      return this._specialDelegate.plumage
-    }
-    return this._plumage || '보통이다';
+    return this._specialDelegate.plumage
   }
 
   get airSpeedVelocity() {
-    return this._specialDelegate ? this._specialDelegate.airSpeedVelocity : null;
+    return this._specialDelegate.airSpeedVelocity
   }
 
   selectSpecialDelegate(data) {
     switch (data.type) {
       case '유럽 제비':
-        return new EuropeanSwallowDelegate()
+        return new EuropeanSwallowDelegate(data, this)
       case '아프리카 제비':
-        return new AfricanSwallowDelegate(data);
+        return new AfricanSwallowDelegate(data, this);
       case '노르웨이 파랑 앵무':
         return new NorwegianBlueParrotDelegate(data, this);
       default:
-        return null;
+        return new SpecialDelegate(data, this);
     }
   }
 }
 
-class EuropeanSwallowDelegate {
+class SpecialDelegate {
+  constructor(data, bird) {
+    this._bird = bird
+  }
+
+  get plumage() {
+    return this._bird._plumage || '보통이다';
+  }
+}
+
+class EuropeanSwallowDelegate extends SpecialDelegate {
   get airSpeedVelocity() {
     return 35;
   }
 }
 
-class EuropeanSwallow extends Bird {
-  get airSpeedVelocity() {
-    return this._specialDelegate.airSpeedVelocity;
-  }
-}
-
-class AfricanSwallowDelegate {
-  constructor(data) {
+class AfricanSwallowDelegate extends SpecialDelegate {
+  constructor(data, bird) {
+    super(data, bird)
     this._numberOfCoconuts = data.numberOfCoconuts;
   }
 
@@ -60,15 +62,9 @@ class AfricanSwallowDelegate {
   }
 }
 
-class AfricanSwallow extends Bird {
-  get airSpeedVelocity() {
-    return this._specialDelegate.airSpeedVelocity;
-  }
-}
-
-class NorwegianBlueParrotDelegate {
+class NorwegianBlueParrotDelegate extends SpecialDelegate {
   constructor(data, bird) {
-    this._bird = bird
+    super(data, bird)
     this._voltage = data.voltage;
     this._isNailed = data.isNailed;
   }
@@ -79,11 +75,5 @@ class NorwegianBlueParrotDelegate {
 
   get airSpeedVelocity() {
     return this._isNailed ? 0 : 10 + this._voltage / 10;
-  }
-}
-
-class NorwegianBlueParrot extends Bird {
-  get airSpeedVelocity() {
-    return this._specialDelegate.airSpeedVelocity;
   }
 }
