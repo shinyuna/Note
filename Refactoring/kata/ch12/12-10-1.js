@@ -1,27 +1,52 @@
+/**
+ * :NOTE
+ * - 위임은 외부로부터 전달 받는 형태로 사용하는 것이 좋다.
+ */
+
 class Booking {
-  constructor(show, date) {
+  #premium;
+  constructor(show) {
     this._show = show;
-    this._date = date;
   }
 
   get hasTalkback() {
-    return this._show.hasOwnProperty('talkback') && !this.isPeakDay;
+    return this.#premium
+      ? this.#premium.hasTalkback()
+      : this._show.hasOwnProperty('talkback') && !this.isPeakDay;
   }
 
   get basePrice() {
-    let result = this._show.price;
+    if (this.#premium) {
+      return this.#premium.basePrice
+    }
 
+    let result = this._show.price;
     if (this.isPeakDay) {
       result += Math.round(result * 0.15);
     }
-
     return result;
+  }
+
+  get hasDinner() {
+    return this.#premium ? this.#premium.hasDinner() : undefined;
+  }
+
+  #bePremium(extras) {
+    this.#premium = new PremiumBooking(this, extras)
+  }
+
+  static createBooking(show) {
+    return new Booking(show)
+  }
+
+  static createPremiumBooking(show, extras) {
+    return new PremiumBooking(show, extras)
   }
 }
 
-class PremiumBooking extends Booking {
-  constructor(show, date, extras) {
-    super(show, date);
+class PremiumBooking {
+  constructor(show, extras) {
+    this._show = show;
     this._extras = extras;
   }
 
@@ -30,7 +55,7 @@ class PremiumBooking extends Booking {
   }
 
   get basePrice() {
-    return Math.round(super.basePrice + this._extras.PremiumFee);
+    return Math.round(this.basePrice + this._extras.PremiumFee);
   }
 
   get hasDinner() {
@@ -38,5 +63,6 @@ class PremiumBooking extends Booking {
   }
 }
 
-const booking = new Booking(show, date);
-const premiumBooking = new PremiumBooking(show, date, extras);
+
+const booking = Booking.createBooking(show, date);
+const premiumBooking = Booking.createPremiumBooking(show, date, extras);
