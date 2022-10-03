@@ -1,23 +1,34 @@
+/**
+ * :NOTE
+ * - 매개변수는 가능하면 사용하지 않는다를 머리속에 박기!
+ * => 매개변수 -> 질의함수
+ */
+
 export class Order {
   constructor(quantity, itemPrice) {
-    this.quantity = quantity;
     this.itemPrice = itemPrice;
+    this._quantity = quantity;
   }
+
+  get basePrice() {
+    return this._quantity * this.itemPrice;
+  }
+
+  get discountLevel() {
+    return this._quantity > 100 ? 2 : 1;
+  }
+
 
   get finalPrice() {
-    const basePrice = this.quantity * this.itemPrice;
-    let discountLevel;
-    if (this.quantity > 100) discountLevel = 2;
-    else discountLevel = 1;
-    return this.discountedPrice(basePrice, discountLevel);
+    return this.#discountedPrice();
   }
 
-  discountedPrice(basePrice, discountLevel) {
-    switch (discountLevel) {
+  #discountedPrice() {
+    switch (this.discountLevel) {
       case 1:
-        return basePrice * 0.95;
+        return this.basePrice * 0.95;
       case 2:
-        return basePrice * 0.9;
+        return this.basePrice * 0.9;
     }
   }
 }
