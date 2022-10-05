@@ -11,47 +11,41 @@
  * - 연산이 필요한 로직은 질의 함수로 추출하기
  */
 
-function calculateCharge(date, quantity, plan) {
-  const isSummer = date.isBefore(plan.summerStart) && date.isAfter(plan.summerEnd)
-
-  function regularCharge() {
-    return quantity * plan.summerRate;
-  }
-
-  function summerCharge() {
-    return quantity * plan.regularRate + plan.regularServiceCharge
-  }
-
-  return isSummer ? summerCharge() : regularCharge();
-}
-
 class Charge {
   #date
   #quantity
   #plan
-
-  get plan() {
-    return this.#plan;
-  }
-
-  set plan(value) {
-    this.#plan = value;
-  }
-
-  get quantity() {
-    return this.#quantity;
-  }
-
-  set quantity(value) {
-    this.#quantity = value;
+  constructor(date, quantity, plan) {
+    this.#date = date
+    this.#quantity = quantity
+    this.#plan = plan
   }
 
   get date() {
     return this.#date;
   }
 
-  set date(value) {
-    this.#date = value;
+  get quantity() {
+    return this.#quantity;
   }
 
+  get plan() {
+    return this.#plan;
+  }
+
+  get regularCharge( ) {
+    return this.quantity * this.plan.summerRate;
+  }
+
+  get summerCharge() {
+    return this.quantity * this.plan.regularRate + this.plan.regularServiceCharge
+  }
+
+  get isSummer() {
+    return this.date.isBefore(this.plan.summerStart) && this.date.isAfter(this.plan.summerEnd)
+  }
+
+  calculateCharge() {
+    return this.isSummer ? this.summerCharge : this.regularCharge
+  }
 }
