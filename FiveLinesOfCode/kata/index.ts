@@ -117,7 +117,17 @@ function draw() {
 
   g.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Draw map
+  drawMap(g);
+
+  drawPlayer(g);
+}
+
+function drawPlayer(g: CanvasRenderingContext2D) {
+  g.fillStyle = '#ff0000';
+  g.fillRect(playerx * TILE_SIZE, playery * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+}
+
+function drawMap(g: CanvasRenderingContext2D) {
   for (let y = 0; y < map.length; y++) {
     for (let x = 0; x < map[y].length; x++) {
       if (map[y][x] === Tile.FLUX) g.fillStyle = '#ccffcc';
@@ -131,10 +141,6 @@ function draw() {
         g.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
     }
   }
-
-  // Draw player
-  g.fillStyle = '#ff0000';
-  g.fillRect(playerx * TILE_SIZE, playery * TILE_SIZE, TILE_SIZE, TILE_SIZE);
 }
 
 function gameLoop() {
