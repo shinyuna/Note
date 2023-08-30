@@ -18,9 +18,9 @@ enum Tile {
 }
 
 enum RawInput {
-  UP,
+  Up,
   DOWN,
-  LEFT,
+  Left,
   RIGHT,
 }
 
@@ -35,7 +35,7 @@ let map: Tile[][] = [
   [2, 2, 2, 2, 2, 2, 2, 2],
 ];
 
-let inputs: RawInput[] = [];
+let inputs: Input[] = [];
 
 function remove(tile: Tile) {
   for (let y = 0; y < map.length; y++) {
@@ -115,18 +115,19 @@ function updateTile(y: number, x: number) {
 function handleInputs() {
   while (inputs.length > 0) {
     let current = inputs.pop();
-    handleInput(current);
+    current.handle();
   }
 }
 
-interface Input2 {
+interface Input {
   isRight(): boolean;
   isLeft(): boolean;
   isUp(): boolean;
   isDown(): boolean;
+  handle(): void;
 }
 
-class Right implements Input2 {
+class Right implements Input {
   isRight() {
     return true;
   }
@@ -142,8 +143,12 @@ class Right implements Input2 {
   isDown() {
     return false;
   }
+
+  handle() {
+    moveHorizontal(1);
+  }
 }
-class LEFT implements Input2 {
+class Left implements Input {
   isRight() {
     return false;
   }
@@ -159,8 +164,12 @@ class LEFT implements Input2 {
   isDown() {
     return false;
   }
+
+  handle() {
+    moveHorizontal(-1);
+  }
 }
-class UP implements Input2 {
+class Up implements Input {
   isRight() {
     return false;
   }
@@ -176,9 +185,13 @@ class UP implements Input2 {
   isDown() {
     return false;
   }
+
+  handle() {
+    moveVertical(-1);
+  }
 }
 
-class Down implements Input2 {
+class Down implements Input {
   isRight() {
     return false;
   }
@@ -194,13 +207,10 @@ class Down implements Input2 {
   isDown() {
     return true;
   }
-}
 
-function handleInput(input: Input2) {
-  if (input.isLeft) moveHorizontal(-1);
-  else if (input.isRight) moveHorizontal(1);
-  else if (input.isUp) moveVertical(-1);
-  else if (input.isDown) moveVertical(1);
+  handle() {
+    moveVertical(1);
+  }
 }
 
 function draw() {
@@ -258,8 +268,8 @@ const UP_KEY = 'ArrowUp';
 const RIGHT_KEY = 'ArrowRight';
 const DOWN_KEY = 'ArrowDown';
 window.addEventListener('keydown', e => {
-  if (e.key === LEFT_KEY || e.key === 'a') inputs.push(RawInput.LEFT);
-  else if (e.key === UP_KEY || e.key === 'w') inputs.push(RawInput.UP);
-  else if (e.key === RIGHT_KEY || e.key === 'd') inputs.push(RawInput.RIGHT);
-  else if (e.key === DOWN_KEY || e.key === 's') inputs.push(RawInput.DOWN);
+  if (e.key === LEFT_KEY || e.key === 'a') inputs.push(new Left());
+  else if (e.key === UP_KEY || e.key === 'w') inputs.push(new Up());
+  else if (e.key === RIGHT_KEY || e.key === 'd') inputs.push(new Right());
+  else if (e.key === DOWN_KEY || e.key === 's') inputs.push(new Down());
 });
