@@ -29,13 +29,20 @@ abstract class Tile {
   isFallingBox() { return false; }
   isLock1() { return false; }
   isLock2() { return false; }
-  color(g: CanvasRenderingContext2D) {}
+  color(g: CanvasRenderingContext2D) { return; }
   draw(g: CanvasRenderingContext2D, x: number, y: number) {
     map[y][x].color(g);
   }
+  isEdible() { return false; }
+  isPushable() { return false; }
+  moveHorizontal(dx: number) { return; }
 }
 class Air extends Tile {
   isAir() { return true; }
+  isEdible() { return true; }
+  moveHorizontal(dx: number) {
+    moveToTile(playerx + dx, playery);
+  }
 }
 class Flux extends Tile {
   isFlux() { return true; }
@@ -45,6 +52,10 @@ class Flux extends Tile {
   draw(g: CanvasRenderingContext2D, x: number, y: number): void {
     map[y][x].color(g);
     g.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+  }
+  isEdible() { return true; }
+  moveHorizontal(dx: number) {
+    moveToTile(playerx + dx, playery);
   }
 }
 class Unbreakable extends Tile {
@@ -69,6 +80,13 @@ class Stone extends Tile {
     map[y][x].color(g);
     g.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
   }
+  isPushable() { return true; }
+  moveHorizontal(dx: number) {
+    if (map[playery][playerx + dx + dx].isAir() && !map[playery + 1][playerx + dx].isAir()) {
+      map[playery][playerx + dx + dx] = map[playery][playerx + dx];
+      moveToTile(playerx + dx, playery);
+    }
+  }
 }
 class Box extends Tile {
   isBox() { return true; }
@@ -78,6 +96,15 @@ class Box extends Tile {
   draw(g: CanvasRenderingContext2D, x: number, y: number): void {
     map[y][x].color(g);
     g.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+  }
+  isPushable() {
+    return true;
+  }
+  moveHorizontal(dx: number) {
+    if (map[playery][playerx + dx + dx].isAir() && !map[playery + 1][playerx + dx].isAir()) {
+      map[playery][playerx + dx + dx] = map[playery][playerx + dx];
+      moveToTile(playerx + dx, playery);
+    }
   }
 }
 class Key1 extends Tile {
@@ -89,6 +116,10 @@ class Key1 extends Tile {
     map[y][x].color(g);
     g.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
   }
+  moveHorizontal(dx: number) {
+    removeLock1();
+    moveToTile(playerx + dx, playery);
+  }
 }
 class Key2 extends Tile {
   isKey2() { return true; }
@@ -98,6 +129,10 @@ class Key2 extends Tile {
   draw(g: CanvasRenderingContext2D, x: number, y: number): void {
     map[y][x].color(g);
     g.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+  }
+  moveHorizontal(dx: number) {
+    removeLock2();
+    moveToTile(playerx + dx, playery);
   }
 }
 class FallingStone extends Tile {
@@ -233,22 +268,7 @@ function moveToTile(newx: number, newy: number) {
 }
 
 function moveHorizontal(dx: number) {
-  if (map[playery][playerx + dx].isFlux() || map[playery][playerx + dx].isAir()) {
-    moveToTile(playerx + dx, playery);
-  } else if (
-    (map[playery][playerx + dx].isStone() || map[playery][playerx + dx].isBox()) &&
-    map[playery][playerx + dx + dx].isAir() &&
-    !map[playery + 1][playerx + dx].isAir()
-  ) {
-    map[playery][playerx + dx + dx] = map[playery][playerx + dx];
-    moveToTile(playerx + dx, playery);
-  } else if (map[playery][playerx + dx].isKey1()) {
-    removeLock1();
-    moveToTile(playerx + dx, playery);
-  } else if (map[playery][playerx + dx].isKey2()) {
-    removeLock2();
-    moveToTile(playerx + dx, playery);
-  }
+  map[playery][playerx + dx].moveHorizontal(dx);
 }
 
 function moveVertical(dy: number) {
