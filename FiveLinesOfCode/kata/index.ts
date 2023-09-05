@@ -86,6 +86,9 @@ let rawMap: RawTile[][] = [
   [2, 2, 2, 2, 2, 2, 2, 2],
 ];
 let map: Tile[][];
+function assertExhaustive(x: never): never {
+  throw new Error('Unexpected object: ' + x);
+}
 function transformTile(title: RawTile) {
   switch (title) {
     case RawTile.AIR:
@@ -112,6 +115,8 @@ function transformTile(title: RawTile) {
       return new Lock1();
     case RawTile.LOCK2:
       return new Lock2();
+    default:
+      return assertExhaustive(title);
   }
 }
 
