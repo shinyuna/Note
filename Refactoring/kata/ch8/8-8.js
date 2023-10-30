@@ -8,7 +8,7 @@ export function acquireData(input) {
     .filter(line => !!line.trim())
     .map(line => line.split(','))
     .filter(record => record[1].trim() === 'India')
-    .map(line => ({ city: lin기e[0].trim(), phone: line[2].trim() }))
+    .map(line => ({ city: line[0].trim(), phone: line[2].trim() }))
 }
 
 const input = `office, country, telephone\n
