@@ -15,9 +15,15 @@ on:
           - "production"
           - "development"
 
+env:
+  ENV: ${{ inputs.environment == 'production' && 'prod' || 'dev' }}
+
 jobs:
   set-env:
     runs-on: ubuntu-latest
     steps:
       - name: Set Environment
-        run: echo ${{ inputs.environment }}
+        run: |
+          echo "환경: ${{ env.ENV }}"
+          echo "실행자: ${{ github.actor }}"
+          echo "이메일: ${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
