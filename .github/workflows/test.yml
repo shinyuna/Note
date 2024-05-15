@@ -1,0 +1,23 @@
+name: 워크플로우 테스트
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "배포할 환경을 선택하세요."
+        required: true
+        default: "development"
+        type: choice
+        options:
+          - "production"
+          - "development"
+
+jobs:
+  set-env:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set Environment
+        run: echo ${{ inputs.environment }}
