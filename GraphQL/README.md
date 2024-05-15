@@ -7,8 +7,8 @@
 
 ### 🎃 공부 기록
 
-|   DATE   |         TITLE         |                                                         REFERENCES                                                         |  NOTE  |
-|:--------:|:---------------------:|:--------------------------------------------------------------------------------------------------------------------------:|:------:|
+|   DATE   |         TITLE         |                                                             REFERENCES                                                             |  NOTE  |
+| :------: | :-------------------: | :--------------------------------------------------------------------------------------------------------------------------------: | :----: |
 | 22/10/29 | Queries and Mutations | [graphQL 공식 문서](https://graphql.org/learn/queries/), [GraphQL 핵심 개념](https://www.howtographql.com/basics/2-core-concepts/) | [🌱]() |
 
 ---
@@ -28,20 +28,20 @@
 
 @ObjectType()
 class Repository {
-    @Field(type => String)
-    name: string;
+  @Field((type) => String)
+  name: string;
 
-    @Field(type => String)
-    description: string
+  @Field((type) => String)
+  description: string;
 
-    @Field(type => Int)
-    starCount: number
+  @Field((type) => Int)
+  starCount: number;
 
-    @Field(type => Boolean)
-    isPrivate: boolean
+  @Field((type) => Boolean)
+  isPrivate: boolean;
 
-    @Field(type => User)
-    owner: User
+  @Field((type) => User)
+  owner: User;
 }
 ```
 
@@ -90,12 +90,12 @@ query {
 
 ```gql
 mutation {
-  updateRepository(input:{ 
+  updateRepository(input:{
     repositoryId: "R_kgDOHN5kgg",
     description: "학습한 내용을 기록합니다.🍀"
   }) {
     repository {
-      description 
+      description
     }
   }
 }
@@ -123,16 +123,15 @@ mutation {
 
 ```gql
 type Query {
-    repository(name: String!, owner:String!): Repository
+  repository(name: String!, owner: String!): Repository
 }
 type Mutation {
-    updateRepository(repositoryId: String!,
-    description: String): Repository!
+  updateRepository(repositoryId: String!, description: String): Repository!
 }
 ```
 
-- 위에서 보이는 것과 같이 repository 정보를 가져오는 쿼리의 API 루트 필드는 ```repository``` 가 됩니다. 추가로 ```repository```에는 인수가 있기 때문에 인수까지 나타내줍니다.
-- 쿼리와 동일하게 repository 정보를 업데이트해주는 뮤테이션의 루트 필드는 ```updateRepository```의 입니다.
+- 위에서 보이는 것과 같이 repository 정보를 가져오는 쿼리의 API 루트 필드는 `repository` 가 됩니다. 추가로 `repository`에는 인수가 있기 때문에 인수까지 나타내줍니다.
+- 쿼리와 동일하게 repository 정보를 업데이트해주는 뮤테이션의 루트 필드는 `updateRepository`의 입니다.
 - 각 명령에 맞는 type을(Query, Mutation) 추가해주시면 됩니다.
 
 ```ts
@@ -148,3 +147,4 @@ async getRestaurants(@Args('input') params: GetRestaurantsInput): Promise<GetRes
 🌈 참고
 
 - [howtographql](https://www.howtographql.com/basics/2-core-concepts/)
+- ㅋㅋ
