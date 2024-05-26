@@ -7,8 +7,8 @@ jobs:
   failed_job:
     runs-on: ubuntu-latest
     steps:
-      - name: Failed Job
-        run: exit 1
+      - name: Success Job
+        run: echo "This is a success job"
 
   caller_other_workflow:
     needs: [failed_job]
