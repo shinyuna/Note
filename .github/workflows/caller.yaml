@@ -1,0 +1,19 @@
+name: Caller Workflow
+
+on:
+  push
+
+jobs:
+  failed_job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Failed Job
+        run: exit 1
+
+  caller_other_workflow:
+    needs: [failed_job]
+    uses: ./.github/workflows/re_usable.yaml
+    with:
+      env: 'development'
+
+
