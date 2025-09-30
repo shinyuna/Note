@@ -41,6 +41,7 @@ export default defineConfig([
       'react/react-in-jsx-scope': 0, // jsx 를 사용하는 곳에 필수적으로 React 를 가져오지 않아도 됨
       'react/no-unknown-property': ['error', { ignore: ['css'] }], // css 속성 사용 가능
 
+      '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/naming-convention': [
         'error',
         {
