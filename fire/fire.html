@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Campfire</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="preload" as="image" href="./assets/background.webp" />
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100%;
+      background-color: #0b1020;
+      position: relative;
+    }
+    .background {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 0;
+      
+      img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+    }
+    canvas {
+      display: block;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+    .hint {
+      position: fixed;
+      bottom: 20px;
+      width: 100%;
+      text-align: center;
+      font-size: 13px;
+      color: rgba(255, 220, 180, 0.6);
+      letter-spacing: 0.04em;
+      user-select: none;
+      pointer-events: none;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <picture class="background">
+    <source srcset="./assets/background.webp" type="image/webp" />
+    <img src="./assets/background.png" alt="forest background" />
+  </picture>
+  <canvas id="canvas"></canvas>
+  <div class="hint">불을 가만히 바라보세요</div>
+
+  <!-- 오디오 요소 (숨김) -->
+  <audio id="fireLoop" loop preload="auto" autoplay>
+    <source src="./assets/fire-crackling.mp3" type="audio/mpeg" />
+  </audio>
+  <audio id="forestLoop" loop preload="auto" autoplay>
+    <source src="./assets/forest.mp3" type="audio/mpeg" />
+  </audio>
+  <audio id="firePopSound" preload="auto">
+    <source src="./assets/fire-pops.mp3" type="audio/mpeg" />
+  </audio>
+
+<script>
+/* =========================
+   Audio Setup
+========================= */
+const fireLoop = document.getElementById('fireLoop');
+const forestLoop = document.getElementById('forestLoop');
+const firePopSound = document.getElementById('firePopSound');
+
+let soundEnabled = false;
+let audioInitialized = false;
+
+function initAudio() {
+  if (audioInitialized) return;
+  
+  audioInitialized = true;
+  
+  // 배경 소리 볼륨 설정 (autoplay로 자동 시작)
+  fireLoop.volume = 0.5;
+  forestLoop.volume = 0.25;
+  
+  // autoplay가 실패할 경우를 대비해 명시적으로 재생 시도
+  fireLoop.play().catch(() => {
+    console.log('Autoplay blocked - waiting for user interaction');
+  });
+  forestLoop.play().catch(() => {
+    console.log('Forest sound autoplay blocked - waiting for user interaction');
+  });
+  
+  soundEnabled = true;
+}
+
+// 페이지 로드 시 바로 오디오 시작 시도
+window.addEventListener('DOMContentLoaded', () => {
+  initAudio();
+});
+
+/* =========================
+   Canvas Setup
+========================= */  
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = innerWidth * dpr;
+  canvas.height = innerHeight * dpr;
+  canvas.style.width = innerWidth + "px";
+  canvas.style.height = innerHeight + "px";
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener("resize", resize);
+resize();
+
+/* =========================
+   Utils
+========================= */
+const rand = (a,b)=>a+Math.random()*(b-a);
+const lerp = (a,b,t)=>a+(b-a)*t;
+
+function getWind(time) {
+  // 시간 기반 자연스러운 바람 (여러 주기 조합)
+  return {
+    x: Math.sin(time * 0.003) * 0.3 + Math.sin(time * 0.007) * 0.15,
+    y: Math.cos(time * 0.005) * 0.1
+  };
+}
+
+/* =========================
+   Fire Particles
+========================= */
+const particles = [];
+let time = 0;
+let intensity = 1;
+let effectiveIntensity = 1; // 호흡 효과가 적용된 intensity
+
+function fireColor(u) {
+  // 이미지처럼 따뜻한 주황-빨강 계열 (하얀색 완전 제거)
+  let r, g, b;
+  
+  if (u < 0.25) {
+    // 밝은 노랑-주황 (중심부) - 따뜻하고 진한 노랑
+    r = 255;
+    g = Math.floor(lerp(200, 160, u / 0.25));
+    b = Math.floor(lerp(60, 30, u / 0.25));
+  } else if (u < 0.5) {
+    // 진한 주황색 (중간부)
+    const t = (u - 0.25) / 0.25;
+    r = 255;
+    g = Math.floor(lerp(160, 100, t));
+    b = Math.floor(lerp(30, 15, t));
+  } else if (u < 0.75) {
+    // 주황-빨강
+    const t = (u - 0.5) / 0.25;
+    r = Math.floor(lerp(255, 220, t));
+    g = Math.floor(lerp(100, 50, t));
+    b = Math.floor(lerp(15, 10, t));
+  } else {
+    // 어두운 빨강/사라짐
+    const t = (u - 0.75) / 0.25;
+    r = Math.floor(lerp(220, 140, t));
+    g = Math.floor(lerp(50, 20, t));
+    b = Math.floor(lerp(10, 5, t));
+  }
+  
+  // 알파값도 조금 더 오래 유지
+  const a = lerp(0.95, 0.0, Math.pow(u, 0.9));
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function spawnFlame(x, y) {
+  const count = Math.floor(10 * effectiveIntensity); // intensity → effectiveIntensity
+  for (let i = 0; i < count; i++) {
+    const life = rand(50, 80);
+    const angle = rand(-Math.PI/3, Math.PI/3); // 위쪽으로 발산
+    const speed = rand(1.6, 2.8) * effectiveIntensity; // intensity → effectiveIntensity
+    
+    particles.push({
+      type: "flame",
+      x: x + rand(-32, 32), // -16, 16 → -32, 32 (2배)
+      y: y + rand(-12, 12), // -6, 6 → -12, 12 (2배)
+      vx: Math.sin(angle) * speed * 0.2,
+      vy: -Math.cos(angle) * speed,
+      size: rand(28, 48), // 14, 24 → 28, 48 (2배)
+      life,
+      maxLife: life,
+      seed: Math.random() * 1000,
+      turbulence: rand(0.01, 0.03), // 난류 강도
+      depth: rand(0, 1), // 깊이감 (0: 뒤, 1: 앞)
+    });
+  }
+}
+
+function spawnCore(x, y) {
+  // 불의 가장 밝은 중심부 (원래대로 복원)
+  const count = Math.floor(6 * effectiveIntensity);
+  for (let i = 0; i < count; i++) {
+    const life = rand(15, 25);
+    particles.push({
+      type: "core",
+      x: x + rand(-16, 16),
+      y: y + rand(-6, 6),
+      vx: rand(-0.1, 0.1),
+      vy: rand(-1.2, -0.8) * effectiveIntensity,
+      size: rand(16, 28),
+      life,
+      maxLife: life,
+      seed: Math.random() * 1000,
+      depth: rand(0.3, 1),
+    });
+  }
+}
+
+function spawnSpark(x, y) {
+  if (Math.random() > 0.12 * effectiveIntensity) return; // intensity → effectiveIntensity
+  const life = rand(20, 40);
+  const angle = rand(-Math.PI/2.5, -Math.PI/4); // 비스듬히 위로
+  const speed = rand(3.0, 5.0);
+  
+  particles.push({
+    type: "spark",
+    x: x + rand(-20, 20), // -10, 10 → -20, 20 (2배)
+    y: y + rand(-12, 12), // -6, 6 → -12, 12 (2배)
+    vx: Math.sin(angle) * speed * 0.3,
+    vy: Math.cos(angle) * speed,
+    size: rand(3, 6), // 2, 4 → 3, 6 (1.5배)
+    life,
+    maxLife: life,
+    seed: Math.random() * 1000,
+    depth: rand(0, 1),
+  });
+}
+
+function spawnSmoke(x, y) {
+  if (Math.random() > 0.08) return;
+  const life = rand(90, 140);
+  particles.push({
+    type: "smoke",
+    x: x + rand(-36, 36), // -18, 18 → -36, 36 (2배)
+    y: y + rand(-20, 0), // -10, 0 → -20, 0 (2배)
+    vx: rand(-0.2, 0.2),
+    vy: rand(-0.7, -0.4),
+    size: rand(36, 64), // 18, 32 → 36, 64 (2배)
+    life,
+    maxLife: life,
+    seed: Math.random() * 1000,
+    depth: rand(0, 0.5), // 연기는 뒤쪽에
+  });
+}
+
+function spawnEmber(x, y) {
+  // 가끔 큰 불똥이 튐 (크랙링 사운드 시각화)
+  if (Math.random() > 0.95) {
+    const angle = rand(0, Math.PI * 2);
+    const speed = rand(4, 7);
+    particles.push({
+      type: "ember",
+      x: x + rand(-20, 20),
+      y: y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 3,
+      size: rand(4, 8),
+      life: rand(40, 60),
+      maxLife: 60,
+      seed: Math.random() * 1000,
+      depth: rand(0.5, 1),
+    });
+    
+    // 불똥과 함께 pop 사운드 재생
+    if (soundEnabled && Math.random() > 0.5) {
+      const pop = firePopSound;
+      pop.volume = 0.2 + Math.random() * 0.2; // 0.2-0.4
+      // 오디오 파일의 랜덤한 위치에서 재생 (0~15초 사이)
+      pop.currentTime = Math.random() * 30;
+      pop.play()
+    }
+  }
+}
+
+/* =========================
+   Glow
+========================= */
+function drawGlow(x, y) {
+  const g = ctx.createRadialGradient(x, y, 40, x, y, 440); // 20, 220 → 40, 440 (2배)
+  g.addColorStop(0, "rgba(255,180,90,0.5)"); // 0.35 → 0.5 (더 밝게)
+  g.addColorStop(0.6, "rgba(255,140,60,0.2)"); // 0.15 → 0.2
+  g.addColorStop(1, "rgba(10,15,30,0)");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x, y, 440, 0, Math.PI * 2); // 220 → 440 (2배)
+  ctx.fill();
+}
+
+function drawGroundReflection(x, y, breathe) {
+  // 바닥에 불빛 반사 (환경광)
+  const reflectionIntensity = 0.15 * breathe;
+  const g = ctx.createRadialGradient(x, y + 100, 0, x, y + 100, 200);
+  g.addColorStop(0, `rgba(255,120,40,${reflectionIntensity})`);
+  g.addColorStop(1, "rgba(255,120,40,0)");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x, y + 100, 200, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawFlame(x, y, size, color, seed) {
+  // 원 대신 불규칙한 형태
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  
+  const points = 8;
+  for (let i = 0; i < points; i++) {
+    const angle = (i / points) * Math.PI * 2;
+    const noise = Math.sin(seed + i * 0.7) * 0.3 + 0.7; // 불규칙성
+    const offset = size * noise;
+    const stretchY = i < points / 2 ? 1.4 : 1.0; // 위쪽으로 늘림
+    const px = x + Math.cos(angle) * offset;
+    const py = y + Math.sin(angle) * offset * stretchY;
+    
+    if (i === 0) {
+      ctx.moveTo(px, py);
+    } else {
+      ctx.lineTo(px, py);
+    }
+  }
+  
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawLog(x, y, width, height, angle, charred = 0) {
+  // 원통형 장작 그리기 (3D 효과)
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  
+  // 장작 본체 (원통형 그라디언트)
+  const logGrad = ctx.createLinearGradient(0, -height/2, 0, height/2);
+  logGrad.addColorStop(0, "rgba(30, 20, 12, 0.9)"); // 위쪽 어두움
+  logGrad.addColorStop(0.3, "rgba(60, 45, 30, 0.95)"); // 밝은 부분
+  logGrad.addColorStop(0.7, "rgba(50, 38, 25, 0.95)"); // 중간
+  logGrad.addColorStop(1, "rgba(25, 18, 10, 0.9)"); // 아래쪽 어두움
+  ctx.fillStyle = logGrad;
+  ctx.fillRect(-width/2, -height/2, width, height);
+  
+  // 나무결 효과 (세로선)
+  ctx.strokeStyle = "rgba(20, 15, 10, 0.3)";
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 5; i++) {
+    const offsetX = -width/2 + (width / 6) * (i + 1);
+    ctx.beginPath();
+    ctx.moveTo(offsetX, -height/2);
+    ctx.lineTo(offsetX + Math.random() * 4 - 2, height/2);
+    ctx.stroke();
+  }
+  
+  // 그을린 부분 (불타는 끝)
+  if (charred > 0) {
+    const charredGrad = ctx.createLinearGradient(-width/2, 0, -width/2 + charred, 0);
+    charredGrad.addColorStop(0, "rgba(10, 5, 3, 0.9)");
+    charredGrad.addColorStop(0.5, "rgba(15, 8, 5, 0.8)");
+    charredGrad.addColorStop(1, "rgba(25, 15, 10, 0.5)");
+    ctx.fillStyle = charredGrad;
+    ctx.fillRect(-width/2, -height/2, charred, height);
+    
+    // 불타는 끝부분 glow
+    ctx.fillStyle = "rgba(180, 60, 20, 0.3)";
+    ctx.fillRect(-width/2, -height/2, charred * 0.3, height);
+  }
+  
+  // 장작 끝부분 (원형)
+  const endGrad = ctx.createRadialGradient(-width/2, 0, 0, -width/2, 0, height/2);
+  endGrad.addColorStop(0, "rgba(45, 35, 22, 0.95)");
+  endGrad.addColorStop(0.7, "rgba(30, 22, 15, 0.9)");
+  endGrad.addColorStop(1, "rgba(20, 15, 10, 0.8)");
+  ctx.fillStyle = endGrad;
+  ctx.beginPath();
+  ctx.arc(-width/2, 0, height/2, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // 나이테 효과
+  ctx.strokeStyle = "rgba(25, 18, 12, 0.5)";
+  ctx.lineWidth = 1.5;
+  for (let r = height/6; r < height/2; r += height/6) {
+    ctx.beginPath();
+    ctx.arc(-width/2, 0, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  
+  ctx.restore();
+}
+
+function drawStone(x, y, size, seed) {
+  // 불규칙한 돌 그리기
+  ctx.save();
+  
+  // 돌의 불규칙한 형태 생성
+  const points = 6 + Math.floor(seed * 3); // 6-8 각형
+  const vertices = [];
+  for (let i = 0; i < points; i++) {
+    const angle = (i / points) * Math.PI * 2;
+    const randomness = 0.7 + (Math.sin(seed * 100 + i) * 0.5 + 0.5) * 0.6; // 0.7-1.3
+    const r = size * randomness;
+    vertices.push({
+      x: x + Math.cos(angle) * r,
+      y: y + Math.sin(angle) * r * 0.8 // 위아래로 눌린 형태
+    });
+  }
+  
+  // 돌 그림자
+  ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+  ctx.beginPath();
+  vertices.forEach((v, i) => {
+    if (i === 0) ctx.moveTo(v.x + 3, v.y + 5);
+    else ctx.lineTo(v.x + 3, v.y + 5);
+  });
+  ctx.closePath();
+  ctx.fill();
+  
+  // 돌 본체 (그라디언트)
+  const stoneGrad = ctx.createRadialGradient(x - size/3, y - size/3, 0, x, y, size);
+  stoneGrad.addColorStop(0, "rgba(140, 135, 130, 0.95)"); // 밝은 부분
+  stoneGrad.addColorStop(0.5, "rgba(100, 95, 90, 0.95)");
+  stoneGrad.addColorStop(1, "rgba(60, 58, 55, 0.9)"); // 어두운 가장자리
+  ctx.fillStyle = stoneGrad;
+  ctx.beginPath();
+  vertices.forEach((v, i) => {
+    if (i === 0) ctx.moveTo(v.x, v.y);
+    else ctx.lineTo(v.x, v.y);
+  });
+  ctx.closePath();
+  ctx.fill();
+  
+  // 돌 질감 (작은 점들)
+  for (let i = 0; i < 8; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = Math.random() * size * 0.6;
+    const px = x + Math.cos(angle) * dist;
+    const py = y + Math.sin(angle) * dist * 0.8;
+    ctx.fillStyle = Math.random() > 0.5 ? "rgba(120, 115, 110, 0.6)" : "rgba(80, 75, 70, 0.5)";
+    ctx.beginPath();
+    ctx.arc(px, py, Math.random() * 2 + 1, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  
+  // 하이라이트
+  ctx.fillStyle = "rgba(160, 155, 150, 0.4)";
+  ctx.beginPath();
+  ctx.arc(x - size/3, y - size/3, size/4, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.restore();
+}
+
+function drawLogs(x, y) {
+  // 바닥에 놓인 장작들 (각도만 다르게)
+  ctx.save();
+  
+  // 장작 1 (왼쪽 앞)
+  drawLog(x - 95, y + 55, 120, 26, -Math.PI / 9, 30);
+  
+  // 장작 2 (왼쪽 뒤)
+  drawLog(x - 60, y + 50, 110, 24, -Math.PI / 12, 25);
+  
+  // 장작 3 (왼쪽 중앙)
+  drawLog(x - 30, y + 58, 115, 25, -Math.PI / 15, 28);
+  
+  // 장작 4 (오른쪽 중앙)
+  drawLog(x + 30, y + 58, 115, 25, Math.PI / 15, 28);
+  
+  // 장작 5 (오른쪽 뒤)
+  drawLog(x + 60, y + 50, 110, 24, Math.PI / 12, 25);
+  
+  // 장작 6 (오른쪽 앞)
+  drawLog(x + 95, y + 55, 120, 26, Math.PI / 9, 30);
+  
+  ctx.restore();
+}
+
+function drawStones(x, y) {
+  // 모닥불 주변 돌들 (장작을 감싸는 형태, 더 크고 앞쪽에)
+  ctx.save();
+  
+  // 여러 개의 돌을 배치 (고정된 seed로 매 프레임 동일하게)
+  const stonePositions = [
+    // 왼쪽 라인 (앞쪽, 크게)
+    { x: x - 135, y: y + 70, size: 24, seed: 0.123 },
+    { x: x - 105, y: y + 80, size: 28, seed: 0.456 },
+    { x: x - 75, y: y + 83, size: 26, seed: 0.789 },
+    { x: x - 45, y: y + 85, size: 22, seed: 0.234 },
+    
+    // 오른쪽 라인 (앞쪽, 크게)
+    { x: x + 45, y: y + 75, size: 22, seed: 0.567 },
+    { x: x + 75, y: y + 73, size: 26, seed: 0.890 },
+    { x: x + 105, y: y + 80, size: 28, seed: 0.345 },
+    { x: x + 130, y: y + 75, size: 25, seed: 0.678 },
+    
+    // 앞쪽 추가 (더 큰 돌들)
+    { x: x - 155, y: y + 75, size: 20, seed: 0.912 },
+    { x: x + 145, y: y + 65, size: 20, seed: 0.321 },
+    
+    // 중앙 앞쪽 작은 돌들
+    { x: x - 15, y: y + 86, size: 28, seed: 0.654 },
+    { x: x + 15, y: y + 80, size: 20, seed: 0.987 },
+  ];
+  
+  stonePositions.forEach(stone => {
+    drawStone(stone.x, stone.y, stone.size, stone.seed);
+  });
+  
+  ctx.restore();
+}
+
+/* =========================
+   Main Loop
+========================= */
+function update() {
+  time++;
+
+  // background - 투명하게 클리어 (배경 이미지가 보이도록)
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  const baseX = innerWidth * 0.5;
+  const baseY = innerHeight * 0.72;
+
+  // intensity decay
+  intensity = Math.max(1, intensity * 0.985);
+  
+  // 불의 호흡 효과 (주기적으로 강해졌다 약해짐)
+  const breathe = Math.sin(time * 0.01) * 0.3 + 1.0; // 0.7 ~ 1.3
+  const effectiveIntensity = intensity * breathe;
+
+  // glow (호흡에 따라 밝기 조절)
+  ctx.globalCompositeOperation = "source-over";
+  const glowIntensity = 0.5 * breathe; // 호흡 효과 반영
+  const g = ctx.createRadialGradient(baseX, baseY + 20, 40, baseX, baseY + 20, 440);
+  g.addColorStop(0, `rgba(255,180,90,${glowIntensity})`);
+  g.addColorStop(0.6, `rgba(255,140,60,${glowIntensity * 0.4})`);
+  g.addColorStop(1, "rgba(10,15,30,0)");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(baseX, baseY + 20, 440, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // 바닥 반사광 추가
+  drawGroundReflection(baseX, baseY, breathe);
+
+  // logs (장작만 먼저 그림)
+  drawLogs(baseX, baseY);
+
+  // spawn
+  spawnFlame(baseX, baseY);
+  spawnCore(baseX, baseY);
+  spawnSpark(baseX, baseY);
+  spawnSmoke(baseX, baseY);
+  spawnEmber(baseX, baseY); // 불똥 추가
+
+  ctx.globalCompositeOperation = "lighter";
+
+  const wind = getWind(time);
+
+  // 깊이 순서로 정렬 (뒤에서 앞으로)
+  particles.sort((a, b) => (a.depth || 0) - (b.depth || 0));
+
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life--;
+    if (p.life <= 0) {
+      particles.splice(i, 1);
+      continue;
+    }
+
+    const u = 1 - p.life / p.maxLife;
+    const wobble = Math.sin(time * 0.05 + p.seed) * 0.25;
+
+    if (p.type === "core") {
+      p.x += p.vx;
+      p.y += p.vy;
+      
+      // 훨씬 더 어두운 색상 + 낮은 알파 (10개 겹쳐도 하얗게 안 됨)
+      const depthScale = 0.7 + (p.depth || 0.5) * 0.3;
+      const r = p.size * (1 - u * 0.5) * depthScale;
+      const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+      // R값 180 이하 + 알파 0.5 이하
+      grad.addColorStop(0, `rgba(180, 120, 25, ${0.45 * (1-u)})`);   // 어두운 주황
+      grad.addColorStop(0.4, `rgba(170, 90, 20, ${0.35 * (1-u)})`);  // 진한 주황
+      grad.addColorStop(0.7, `rgba(160, 60, 15, ${0.25 * (1-u)})`);  // 주황-빨강
+      grad.addColorStop(1, `rgba(140, 40, 10, 0)`);                   // 빨강으로 페이드
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    if (p.type === "flame") {
+      p.vx += wobble * 0.02 + wind.x * 0.02;
+      p.vy += wind.y * 0.01;
+      p.vx *= 0.98;
+      p.vy *= 0.995;
+      
+      // 난류 효과
+      if (p.turbulence) {
+        p.vx += (Math.random() - 0.5) * p.turbulence;
+      }
+      
+      p.x += p.vx;
+      p.y += p.vy;
+
+      const depthScale = 0.7 + (p.depth || 0.5) * 0.3;
+      const r = p.size * (1 - u * 0.7) * depthScale;
+      drawFlame(p.x, p.y, r, fireColor(u), p.seed);
+    }
+
+    if (p.type === "spark") {
+      p.vy += 0.1;
+      p.x += p.vx;
+      p.y += p.vy;
+      const depthScale = 0.7 + (p.depth || 0.5) * 0.3;
+      const sparkSize = p.size * depthScale;
+      ctx.fillStyle = `rgba(255,220,160,${1-u})`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, sparkSize, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    if (p.type === "smoke") {
+      ctx.globalCompositeOperation = "source-over";
+      p.vx += wind.x * 0.05; // 연기는 바람 영향 더 받음
+      p.vy += wind.y * 0.03;
+      p.x += p.vx + wobble * 0.01;
+      p.y += p.vy;
+      const depthScale = 0.7 + (p.depth || 0.5) * 0.3;
+      ctx.fillStyle = `rgba(210,220,255,${(1-u)*0.15})`;
+      ctx.beginPath();
+      ctx.arc(
+        p.x,
+        p.y,
+        p.size * (0.6 + u) * depthScale,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+      ctx.globalCompositeOperation = "lighter";
+    }
+    
+    if (p.type === "ember") {
+      p.vy += 0.15; // 중력
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vx *= 0.98; // 공기 저항
+      
+      const depthScale = 0.7 + (p.depth || 0.5) * 0.3;
+      const emberSize = p.size * depthScale;
+      
+      // 따뜻한 주황 glow
+      const glowSize = emberSize * 2;
+      ctx.fillStyle = `rgba(255,140,40,${(1-u)*0.4})`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, glowSize, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // 밝은 주황-노랑 중심 (하얀색 아님)
+      ctx.fillStyle = `rgba(255,220,100,${1-u})`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, emberSize, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  if (particles.length > 1200) { // 600 → 1200 (2배)
+    particles.splice(0, particles.length - 1200);
+  }
+
+  // 돌들을 마지막에 그려서 앞에 보이도록 (불 파티클 위에)
+  ctx.globalCompositeOperation = "source-over";
+  drawStones(baseX, baseY);
+
+  requestAnimationFrame(update);
+}
+
+update();
+
+/* =========================
+   Interaction (Boost)
+========================= */
+window.addEventListener("click", () => {
+  intensity = Math.min(intensity + 1.6, 3.5);
+  
+  // 클릭 시 사운드 볼륨 일시적으로 증가
+  if (soundEnabled && fireLoop) {
+    fireLoop.volume = Math.min(0.6, fireLoop.volume + 0.2);
+    setTimeout(() => {
+      fireLoop.volume = 0.4;
+    }, 2000);
+  }
+});
+</script>
+</body>
+</html>
