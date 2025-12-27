@@ -70,6 +70,7 @@ function getWind(time) {
 const particles = [];
 let time = 0;
 let intensity = 1;
+let effectiveIntensity = 1; // 호흡 효과가 적용된 intensity
 
 function fireColor(u) {
   // 다단계 색상 전환: 밝은 노랑 → 주황 → 빨강 → 어두운 빨강
@@ -97,19 +98,19 @@ function fireColor(u) {
 }
 
 function spawnFlame(x, y) {
-  const count = Math.floor(5 * intensity);
+  const count = Math.floor(10 * effectiveIntensity); // intensity → effectiveIntensity
   for (let i = 0; i < count; i++) {
     const life = rand(50, 80);
     const angle = rand(-Math.PI/3, Math.PI/3); // 위쪽으로 발산
-    const speed = rand(1.6, 2.8) * intensity;
+    const speed = rand(1.6, 2.8) * effectiveIntensity; // intensity → effectiveIntensity
     
     particles.push({
       type: "flame",
-      x: x + rand(-16, 16),
-      y: y + rand(-6, 6),
+      x: x + rand(-32, 32), // -16, 16 → -32, 32 (2배)
+      y: y + rand(-12, 12), // -6, 6 → -12, 12 (2배)
       vx: Math.sin(angle) * speed * 0.2,
       vy: -Math.cos(angle) * speed,
-      size: rand(14, 24),
+      size: rand(28, 48), // 14, 24 → 28, 48 (2배)
       life,
       maxLife: life,
       seed: Math.random() * 1000,
@@ -121,16 +122,16 @@ function spawnFlame(x, y) {
 
 function spawnCore(x, y) {
   // 불의 가장 밝은 중심부
-  const count = Math.floor(3 * intensity);
+  const count = Math.floor(6 * effectiveIntensity); // intensity → effectiveIntensity
   for (let i = 0; i < count; i++) {
     const life = rand(15, 25);
     particles.push({
       type: "core",
-      x: x + rand(-8, 8),
-      y: y + rand(-3, 3),
+      x: x + rand(-16, 16), // -8, 8 → -16, 16 (2배)
+      y: y + rand(-6, 6), // -3, 3 → -6, 6 (2배)
       vx: rand(-0.1, 0.1),
-      vy: rand(-1.2, -0.8) * intensity,
-      size: rand(8, 14),
+      vy: rand(-1.2, -0.8) * effectiveIntensity, // intensity → effectiveIntensity
+      size: rand(16, 28), // 8, 14 → 16, 28 (2배)
       life,
       maxLife: life,
       seed: Math.random() * 1000,
@@ -140,18 +141,18 @@ function spawnCore(x, y) {
 }
 
 function spawnSpark(x, y) {
-  if (Math.random() > 0.12 * intensity) return;
+  if (Math.random() > 0.12 * effectiveIntensity) return; // intensity → effectiveIntensity
   const life = rand(20, 40);
   const angle = rand(-Math.PI/2.5, -Math.PI/4); // 비스듬히 위로
   const speed = rand(3.0, 5.0);
   
   particles.push({
     type: "spark",
-    x: x + rand(-10, 10),
-    y: y + rand(-6, 6),
+    x: x + rand(-20, 20), // -10, 10 → -20, 20 (2배)
+    y: y + rand(-12, 12), // -6, 6 → -12, 12 (2배)
     vx: Math.sin(angle) * speed * 0.3,
     vy: Math.cos(angle) * speed,
-    size: rand(2, 4),
+    size: rand(3, 6), // 2, 4 → 3, 6 (1.5배)
     life,
     maxLife: life,
     seed: Math.random() * 1000,
@@ -164,11 +165,11 @@ function spawnSmoke(x, y) {
   const life = rand(90, 140);
   particles.push({
     type: "smoke",
-    x: x + rand(-18, 18),
-    y: y + rand(-10, 0),
+    x: x + rand(-36, 36), // -18, 18 → -36, 36 (2배)
+    y: y + rand(-20, 0), // -10, 0 → -20, 0 (2배)
     vx: rand(-0.2, 0.2),
     vy: rand(-0.7, -0.4),
-    size: rand(18, 32),
+    size: rand(36, 64), // 18, 32 → 36, 64 (2배)
     life,
     maxLife: life,
     seed: Math.random() * 1000,
@@ -176,17 +177,49 @@ function spawnSmoke(x, y) {
   });
 }
 
+function spawnEmber(x, y) {
+  // 가끔 큰 불똥이 튐 (크랙링 사운드 시각화)
+  if (Math.random() > 0.95) {
+    const angle = rand(0, Math.PI * 2);
+    const speed = rand(4, 7);
+    particles.push({
+      type: "ember",
+      x: x + rand(-20, 20),
+      y: y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 3,
+      size: rand(4, 8),
+      life: rand(40, 60),
+      maxLife: 60,
+      seed: Math.random() * 1000,
+      depth: rand(0.5, 1),
+    });
+  }
+}
+
 /* =========================
    Glow
 ========================= */
 function drawGlow(x, y) {
-  const g = ctx.createRadialGradient(x, y, 20, x, y, 220);
-  g.addColorStop(0, "rgba(255,180,90,0.35)");
-  g.addColorStop(0.6, "rgba(255,140,60,0.15)");
+  const g = ctx.createRadialGradient(x, y, 40, x, y, 440); // 20, 220 → 40, 440 (2배)
+  g.addColorStop(0, "rgba(255,180,90,0.5)"); // 0.35 → 0.5 (더 밝게)
+  g.addColorStop(0.6, "rgba(255,140,60,0.2)"); // 0.15 → 0.2
   g.addColorStop(1, "rgba(10,15,30,0)");
   ctx.fillStyle = g;
   ctx.beginPath();
-  ctx.arc(x, y, 220, 0, Math.PI * 2);
+  ctx.arc(x, y, 440, 0, Math.PI * 2); // 220 → 440 (2배)
+  ctx.fill();
+}
+
+function drawGroundReflection(x, y, breathe) {
+  // 바닥에 불빛 반사 (환경광)
+  const reflectionIntensity = 0.15 * breathe;
+  const g = ctx.createRadialGradient(x, y + 100, 0, x, y + 100, 200);
+  g.addColorStop(0, `rgba(255,120,40,${reflectionIntensity})`);
+  g.addColorStop(1, "rgba(255,120,40,0)");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x, y + 100, 200, 0, Math.PI * 2);
   ctx.fill();
 }
 
@@ -216,32 +249,32 @@ function drawFlame(x, y, size, color, seed) {
 }
 
 function drawLogs(x, y) {
-  // 불이 타는 장작 표현
+  // 불이 타는 장작 표현 (2배 크기)
   ctx.save();
   
   // 장작 1 (왼쪽)
   ctx.fillStyle = "rgba(40, 30, 20, 0.95)";
-  ctx.fillRect(x - 70, y + 20, 60, 14);
+  ctx.fillRect(x - 140, y + 40, 120, 28); // x-70, y+20, 60, 14 → 2배
   
   // 그을린 효과 (장작 1)
   ctx.fillStyle = "rgba(15, 10, 5, 0.7)";
-  ctx.fillRect(x - 68, y + 20, 15, 14);
+  ctx.fillRect(x - 136, y + 40, 30, 28); // x-68, y+20, 15, 14 → 2배
   
   // 장작 2 (오른쪽, 기울어진)
   ctx.save();
-  ctx.translate(x + 35, y + 27);
+  ctx.translate(x + 70, y + 54); // x+35, y+27 → 2배
   ctx.rotate(Math.PI / 9);
   ctx.fillStyle = "rgba(45, 35, 25, 0.95)";
-  ctx.fillRect(-30, -7, 60, 14);
+  ctx.fillRect(-60, -14, 120, 28); // -30, -7, 60, 14 → 2배
   
   // 그을린 효과 (장작 2)
   ctx.fillStyle = "rgba(15, 10, 5, 0.7)";
-  ctx.fillRect(-28, -7, 12, 14);
+  ctx.fillRect(-56, -14, 24, 28); // -28, -7, 12, 14 → 2배
   ctx.restore();
   
   // 장작 3 (중앙 뒤쪽, 작게)
   ctx.fillStyle = "rgba(35, 25, 18, 0.8)";
-  ctx.fillRect(x - 25, y + 28, 50, 10);
+  ctx.fillRect(x - 50, y + 56, 100, 20); // x-25, y+28, 50, 10 → 2배
   
   ctx.restore();
 }
@@ -262,10 +295,25 @@ function update() {
 
   // intensity decay
   intensity = Math.max(1, intensity * 0.985);
+  
+  // 불의 호흡 효과 (주기적으로 강해졌다 약해짐)
+  const breathe = Math.sin(time * 0.01) * 0.3 + 1.0; // 0.7 ~ 1.3
+  const effectiveIntensity = intensity * breathe;
 
-  // glow
+  // glow (호흡에 따라 밝기 조절)
   ctx.globalCompositeOperation = "source-over";
-  drawGlow(baseX, baseY + 20);
+  const glowIntensity = 0.5 * breathe; // 호흡 효과 반영
+  const g = ctx.createRadialGradient(baseX, baseY + 20, 40, baseX, baseY + 20, 440);
+  g.addColorStop(0, `rgba(255,180,90,${glowIntensity})`);
+  g.addColorStop(0.6, `rgba(255,140,60,${glowIntensity * 0.4})`);
+  g.addColorStop(1, "rgba(10,15,30,0)");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(baseX, baseY + 20, 440, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // 바닥 반사광 추가
+  drawGroundReflection(baseX, baseY, breathe);
 
   // logs (장작은 불 아래에)
   drawLogs(baseX, baseY);
@@ -275,6 +323,7 @@ function update() {
   spawnCore(baseX, baseY);
   spawnSpark(baseX, baseY);
   spawnSmoke(baseX, baseY);
+  spawnEmber(baseX, baseY); // 불똥 추가
 
   ctx.globalCompositeOperation = "lighter";
 
@@ -361,10 +410,33 @@ function update() {
       ctx.fill();
       ctx.globalCompositeOperation = "lighter";
     }
+    
+    if (p.type === "ember") {
+      p.vy += 0.15; // 중력
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vx *= 0.98; // 공기 저항
+      
+      const depthScale = 0.7 + (p.depth || 0.5) * 0.3;
+      const emberSize = p.size * depthScale;
+      
+      // 뜨거운 불똥 효과 (외부 glow)
+      const glowSize = emberSize * 2;
+      ctx.fillStyle = `rgba(255,100,30,${(1-u)*0.3})`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, glowSize, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // 밝은 중심
+      ctx.fillStyle = `rgba(255,200,100,${1-u})`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, emberSize, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
-  if (particles.length > 600) {
-    particles.splice(0, particles.length - 600);
+  if (particles.length > 1200) { // 600 → 1200 (2배)
+    particles.splice(0, particles.length - 1200);
   }
 
   requestAnimationFrame(update);
