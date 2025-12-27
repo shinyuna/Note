@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Campfire</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #0b1020;
+      overflow: hidden;
+      height: 100%;
+    }
+    canvas {
+      display: block;
+    }
+    .hint {
+      position: fixed;
+      bottom: 20px;
+      width: 100%;
+      text-align: center;
+      font-size: 13px;
+      color: rgba(255, 220, 180, 0.6);
+      letter-spacing: 0.04em;
+      user-select: none;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div class="hint">불을 가만히 바라보세요</div>
+
+<script>
+/* =========================
+   Canvas Setup
+========================= */
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = innerWidth * dpr;
+  canvas.height = innerHeight * dpr;
+  canvas.style.width = innerWidth + "px";
+  canvas.style.height = innerHeight + "px";
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener("resize", resize);
+resize();
+
+/* =========================
+   Utils
+========================= */
+const rand = (a,b)=>a+Math.random()*(b-a);
+const lerp = (a,b,t)=>a+(b-a)*t;
+
+function getWind(time) {
+  // 시간 기반 자연스러운 바람 (여러 주기 조합)
+  return {
+    x: Math.sin(time * 0.003) * 0.3 + Math.sin(time * 0.007) * 0.15,
+    y: Math.cos(time * 0.005) * 0.1
+  };
+}
+
+/* =========================
+   Fire Particles
+========================= */
+const particles = [];
+let time = 0;
+let intensity = 1;
+
+function fireColor(u) {
+  // 다단계 색상 전환: 밝은 노랑 → 주황 → 빨강 → 어두운 빨강
+  let r, g, b;
+  if (u < 0.3) {
+    // 밝은 노랑/흰색 (불꽃 중심)
+    r = Math.floor(lerp(255, 255, u / 0.3));
+    g = Math.floor(lerp(240, 200, u / 0.3));
+    b = Math.floor(lerp(150, 60, u / 0.3));
+  } else if (u < 0.7) {
+    // 주황색 전환
+    const t = (u - 0.3) / 0.4;
+    r = Math.floor(lerp(255, 220, t));
+    g = Math.floor(lerp(200, 80, t));
+    b = Math.floor(lerp(60, 20, t));
+  } else {
+    // 어두운 빨강/사라짐
+    const t = (u - 0.7) / 0.3;
+    r = Math.floor(lerp(220, 100, t));
+    g = Math.floor(lerp(80, 20, t));
+    b = Math.floor(lerp(20, 10, t));
+  }
+  const a = lerp(0.95, 0.0, Math.pow(u, 0.8)); // 비선형 페이드아웃
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function spawnFlame(x, y) {
+  const count = Math.floor(5 * intensity);
+  for (let i = 0; i < count; i++) {
+    const life = rand(50, 80);
+    const angle = rand(-Math.PI/3, Math.PI/3); // 위쪽으로 발산
+    const speed = rand(1.6, 2.8) * intensity;
+    
+    particles.push({
+      type: "flame",
+      x: x + rand(-16, 16),
+      y: y + rand(-6, 6),
+      vx: Math.sin(angle) * speed * 0.2,
+      vy: -Math.cos(angle) * speed,
+      size: rand(14, 24),
+      life,
+      maxLife: life,
+      seed: Math.random() * 1000,
+      turbulence: rand(0.01, 0.03), // 난류 강도
+      depth: rand(0, 1), // 깊이감 (0: 뒤, 1: 앞)
+    });
+  }
+}
+
+function spawnCore(x, y) {
+  // 불의 가장 밝은 중심부
+  const count = Math.floor(3 * intensity);
+  for (let i = 0; i < count; i++) {
+    const life = rand(15, 25);
+    particles.push({
+      type: "core",
+      x: x + rand(-8, 8),
+      y: y + rand(-3, 3),
+      vx: rand(-0.1, 0.1),
+      vy: rand(-1.2, -0.8) * intensity,
+      size: rand(8, 14),
+      life,
+      maxLife: life,
+      seed: Math.random() * 1000,
+      depth: rand(0.3, 1), // 코어는 앞쪽에
+    });
+  }
+}
+
+function spawnSpark(x, y) {
+  if (Math.random() > 0.12 * intensity) return;
+  const life = rand(20, 40);
+  const angle = rand(-Math.PI/2.5, -Math.PI/4); // 비스듬히 위로
+  const speed = rand(3.0, 5.0);
+  
+  particles.push({
+    type: "spark",
+    x: x + rand(-10, 10),
+    y: y + rand(-6, 6),
+    vx: Math.sin(angle) * speed * 0.3,
+    vy: Math.cos(angle) * speed,
+    size: rand(2, 4),
+    life,
+    maxLife: life,
+    seed: Math.random() * 1000,
+    depth: rand(0, 1),
+  });
+}
+
+function spawnSmoke(x, y) {
+  if (Math.random() > 0.08) return;
+  const life = rand(90, 140);
+  particles.push({
+    type: "smoke",
+    x: x + rand(-18, 18),
+    y: y + rand(-10, 0),
+    vx: rand(-0.2, 0.2),
+    vy: rand(-0.7, -0.4),
+    size: rand(18, 32),
+    life,
+    maxLife: life,
+    seed: Math.random() * 1000,
+    depth: rand(0, 0.5), // 연기는 뒤쪽에
+  });
+}
+
+/* =========================
+   Glow
+========================= */
+function drawGlow(x, y) {
+  const g = ctx.createRadialGradient(x, y, 20, x, y, 220);
+  g.addColorStop(0, "rgba(255,180,90,0.35)");
+  g.addColorStop(0.6, "rgba(255,140,60,0.15)");
+  g.addColorStop(1, "rgba(10,15,30,0)");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x, y, 220, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawFlame(x, y, size, color, seed) {
+  // 원 대신 불규칙한 형태
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  
+  const points = 8;
+  for (let i = 0; i < points; i++) {
+    const angle = (i / points) * Math.PI * 2;
+    const noise = Math.sin(seed + i * 0.7) * 0.3 + 0.7; // 불규칙성
+    const offset = size * noise;
+    const stretchY = i < points / 2 ? 1.4 : 1.0; // 위쪽으로 늘림
+    const px = x + Math.cos(angle) * offset;
+    const py = y + Math.sin(angle) * offset * stretchY;
+    
+    if (i === 0) {
+      ctx.moveTo(px, py);
+    } else {
+      ctx.lineTo(px, py);
+    }
+  }
+  
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawLogs(x, y) {
+  // 불이 타는 장작 표현
+  ctx.save();
+  
+  // 장작 1 (왼쪽)
+  ctx.fillStyle = "rgba(40, 30, 20, 0.95)";
+  ctx.fillRect(x - 70, y + 20, 60, 14);
+  
+  // 그을린 효과 (장작 1)
+  ctx.fillStyle = "rgba(15, 10, 5, 0.7)";
+  ctx.fillRect(x - 68, y + 20, 15, 14);
+  
+  // 장작 2 (오른쪽, 기울어진)
+  ctx.save();
+  ctx.translate(x + 35, y + 27);
+  ctx.rotate(Math.PI / 9);
+  ctx.fillStyle = "rgba(45, 35, 25, 0.95)";
+  ctx.fillRect(-30, -7, 60, 14);
+  
+  // 그을린 효과 (장작 2)
+  ctx.fillStyle = "rgba(15, 10, 5, 0.7)";
+  ctx.fillRect(-28, -7, 12, 14);
+  ctx.restore();
+  
+  // 장작 3 (중앙 뒤쪽, 작게)
+  ctx.fillStyle = "rgba(35, 25, 18, 0.8)";
+  ctx.fillRect(x - 25, y + 28, 50, 10);
+  
+  ctx.restore();
+}
+
+/* =========================
+   Main Loop
+========================= */
+function update() {
+  time++;
+
+  // background
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = "#0b1020";
+  ctx.fillRect(0,0,innerWidth,innerHeight);
+
+  const baseX = innerWidth * 0.5;
+  const baseY = innerHeight * 0.72;
+
+  // intensity decay
+  intensity = Math.max(1, intensity * 0.985);
+
+  // glow
+  ctx.globalCompositeOperation = "source-over";
+  drawGlow(baseX, baseY + 20);
+
+  // logs (장작은 불 아래에)
+  drawLogs(baseX, baseY);
+
+  // spawn
+  spawnFlame(baseX, baseY);
+  spawnCore(baseX, baseY);
+  spawnSpark(baseX, baseY);
+  spawnSmoke(baseX, baseY);
+
+  ctx.globalCompositeOperation = "lighter";
+
+  const wind = getWind(time);
+
+  // 깊이 순서로 정렬 (뒤에서 앞으로)
+  particles.sort((a, b) => (a.depth || 0) - (b.depth || 0));
+
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life--;
+    if (p.life <= 0) {
+      particles.splice(i, 1);
+      continue;
+    }
+
+    const u = 1 - p.life / p.maxLife;
+    const wobble = Math.sin(time * 0.05 + p.seed) * 0.25;
+
+    if (p.type === "core") {
+      p.x += p.vx;
+      p.y += p.vy;
+      
+      // 밝은 중심부 렌더링 (그라데이션)
+      const depthScale = 0.7 + (p.depth || 0.5) * 0.3;
+      const r = p.size * (1 - u * 0.5) * depthScale;
+      const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+      grad.addColorStop(0, `rgba(255, 255, 240, ${0.9 * (1-u)})`);
+      grad.addColorStop(0.4, `rgba(255, 200, 80, ${0.7 * (1-u)})`);
+      grad.addColorStop(1, `rgba(255, 120, 20, 0)`);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    if (p.type === "flame") {
+      p.vx += wobble * 0.02 + wind.x * 0.02;
+      p.vy += wind.y * 0.01;
+      p.vx *= 0.98;
+      p.vy *= 0.995;
+      
+      // 난류 효과
+      if (p.turbulence) {
+        p.vx += (Math.random() - 0.5) * p.turbulence;
+      }
+      
+      p.x += p.vx;
+      p.y += p.vy;
+
+      const depthScale = 0.7 + (p.depth || 0.5) * 0.3;
+      const r = p.size * (1 - u * 0.7) * depthScale;
+      drawFlame(p.x, p.y, r, fireColor(u), p.seed);
+    }
+
+    if (p.type === "spark") {
+      p.vy += 0.1;
+      p.x += p.vx;
+      p.y += p.vy;
+      const depthScale = 0.7 + (p.depth || 0.5) * 0.3;
+      const sparkSize = p.size * depthScale;
+      ctx.fillStyle = `rgba(255,220,160,${1-u})`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, sparkSize, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    if (p.type === "smoke") {
+      ctx.globalCompositeOperation = "source-over";
+      p.vx += wind.x * 0.05; // 연기는 바람 영향 더 받음
+      p.vy += wind.y * 0.03;
+      p.x += p.vx + wobble * 0.01;
+      p.y += p.vy;
+      const depthScale = 0.7 + (p.depth || 0.5) * 0.3;
+      ctx.fillStyle = `rgba(210,220,255,${(1-u)*0.15})`;
+      ctx.beginPath();
+      ctx.arc(
+        p.x,
+        p.y,
+        p.size * (0.6 + u) * depthScale,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+      ctx.globalCompositeOperation = "lighter";
+    }
+  }
+
+  if (particles.length > 600) {
+    particles.splice(0, particles.length - 600);
+  }
+
+  requestAnimationFrame(update);
+}
+
+update();
+
+/* =========================
+   Interaction (Boost)
+========================= */
+window.addEventListener("click", () => {
+  intensity = Math.min(intensity + 1.6, 3.5);
+});
+</script>
+</body>
+</html>
