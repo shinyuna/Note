@@ -177,5 +177,6 @@ http://localhost:5173/campfire
 MIT License
 
 ## 제작자
-YoonG - 2024
+Yoongfoo - 2026
+
 

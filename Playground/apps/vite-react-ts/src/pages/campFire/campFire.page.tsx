@@ -50,7 +50,7 @@ export default function CampFirePage() {
       ]);
 
       // 피드백 메시지 표시
-      setFeedbackMessage('감정 소각 완료 💨');
+      setFeedbackMessage('감정을 말끔히 소각했어요 💨');
       setTimeout(() => setFeedbackMessage(null), 2000);
     }
     setActiveWorry(null);

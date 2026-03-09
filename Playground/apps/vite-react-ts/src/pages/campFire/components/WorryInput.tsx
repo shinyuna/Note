@@ -75,14 +75,12 @@ export function WorryInput({
     transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
     transform: isOpen ? 'translateY(0)' : 'translateY(30px)',
     opacity: isOpen ? 1 : 0,
-    maxHeight: isOpen ? '450px' : '0',
+    maxHeight: isOpen ? '500px' : '0',
     marginBottom: isOpen ? '16px' : '0',
     borderRadius: '8px',
-    boxShadow: isCrumpling
-      ? 'none'
-      : isFocused
-        ? '0 0 30px rgba(255, 140, 60, 0.4), 0 8px 20px rgba(0, 0, 0, 0.3)'
-        : '0 8px 25px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2)',
+    boxShadow: isFocused
+      ? '0 0 30px rgba(255, 140, 60, 0.4), 0 8px 20px rgba(0, 0, 0, 0.3)'
+      : 'none',
   };
 
   const paperImageStyle: CSSProperties = {
@@ -99,13 +97,12 @@ export function WorryInput({
     position: 'absolute',
     top: 0,
     left: 0,
+    zIndex: 2, // textarea 위에 표시
     backgroundImage: 'url(/fire/assets/paper_crumple.png)',
     backgroundSize: '400%', // 4개 프레임이 가로로 나열
     backgroundRepeat: 'no-repeat',
     backgroundPosition: '0% 50%', // 세로 중앙 정렬
     transformOrigin: '50% 60%', // 손으로 뭉치는 느낌 보정
-    borderRadius: '8px',
-    zIndex: 2, // textarea 위에 표시
     pointerEvents: 'none', // 클릭 이벤트는 textarea로 전달
     animation: `crumpleSprite ${CRUMBLE_DURATION}ms steps(3, end) forwards`,
   };
@@ -237,10 +234,6 @@ export function WorryInput({
             [data-worry-input-form] {
               bottom: 30px !important;
             }
-
-            [data-worry-input-textarea-wrapper] {
-              max-height: 300px !important;
-            }
           }
         `}
       </style>
@@ -266,7 +259,7 @@ export function WorryInput({
               : 'none';
           }}
         >
-          🔥 걱정/근심/불안 소각하기
+          🔥 불안 소각하기
         </button>
 
         {/* textarea 폼 */}
@@ -303,7 +296,7 @@ export function WorryInput({
                     onChange={(e) => setText(e.target.value)}
                     onFocus={() => setIsFocused(true)}
                     onBlur={() => setIsFocused(false)}
-                    placeholder="지금 날 괴롭히는 생각을 적어보세요..."
+                    placeholder="지금 날 괴롭히는 감정을 글로 구체화 시켜보세요..."
                     disabled={disabled || isCrumpling}
                     maxLength={MAX_TEXT_LENGTH}
                     style={textareaStyle}
@@ -336,7 +329,7 @@ export function WorryInput({
                     : 'none';
               }}
             >
-              {isCrumpling ? '구기는 중...' : '🔥 걱정/근심/불안 구겨버리기'}
+              {isCrumpling ? '구기는 중...' : '🔥 이 감정 구겨버리기'}
             </button>
           </form>
         )}
