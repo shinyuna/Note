@@ -35,6 +35,8 @@
       top: 0;
       left: 0;
       z-index: 1;
+      touch-action: none; /* 터치 시 스크롤 방지 */
+      cursor: pointer;
     }
     .hint {
       position: fixed;
@@ -143,76 +145,99 @@ const particles = [];
 let time = 0;
 let intensity = 1;
 let effectiveIntensity = 1; // 호흡 효과가 적용된 intensity
+let fireBoostWave = 0; // 불꽃 부스트 파동 (0~1)
 
+// 🔥 불 크기 조절 (0.5 = 50%, 0.7 = 70%, 1.0 = 100%)
+const FIRE_SCALE = 0.6;
+
+/* =========================
+   불꽃 스프라이트 미리 생성 (성능 최적화 핵심)
+========================= */
+const spriteCanvas = document.createElement('canvas');
+const sCtx = spriteCanvas.getContext('2d');
+const sprites = [];
+
+function createFireSprites() {
+  const sizes = [50, 80, 120, 160]; 
+  spriteCanvas.width = 800;
+  spriteCanvas.height = 200;
+
+  sizes.forEach((size, i) => {
+    const x = i * 200 + 100;
+    const y = 100;
+    const radius = size / 2;
+    
+    // 여러 개의 작은 덩어리를 겹쳐서 '몽글몽글한' 질감 생성
+    for (let j = 0; j < 6; j++) {
+      const px = x + rand(-radius * 0.3, radius * 0.3);
+      const py = y + rand(-radius * 0.3, radius * 0.3);
+      const pRadius = radius * rand(0.5, 0.8);
+      
+      const grad = sCtx.createRadialGradient(px, py, 0, px, py, pRadius);
+      grad.addColorStop(0, 'rgba(255, 200, 50, 0.4)'); // 따뜻한 중심
+      grad.addColorStop(0.4, 'rgba(255, 80, 20, 0.2)'); // 중간 주황
+      grad.addColorStop(1, 'rgba(150, 20, 0, 0)');     // 외곽 붉은색 소멸
+      
+      sCtx.fillStyle = grad;
+      sCtx.beginPath();
+      sCtx.arc(px, py, pRadius, 0, Math.PI * 2);
+      sCtx.fill();
+    }
+    // 스프라이트 영역 정보 저장 (정확한 좌표 계산을 위해)
+    sprites.push({ x: x - 100, y: y - 100, size: 200 });
+  });
+}
+
+// 페이지 로드 시 스프라이트 생성
+createFireSprites();
+
+// 개선된 유기적 불꽃 색상 함수 (스프라이트와 함께 사용)
 function fireColor(u) {
-  // 이미지처럼 따뜻한 주황-빨강 계열 (하얀색 완전 제거)
-  let r, g, b;
-  
-  if (u < 0.25) {
-    // 밝은 노랑-주황 (중심부) - 따뜻하고 진한 노랑
-    r = 255;
-    g = Math.floor(lerp(200, 160, u / 0.25));
-    b = Math.floor(lerp(60, 30, u / 0.25));
-  } else if (u < 0.5) {
-    // 진한 주황색 (중간부)
-    const t = (u - 0.25) / 0.25;
-    r = 255;
-    g = Math.floor(lerp(160, 100, t));
-    b = Math.floor(lerp(30, 15, t));
-  } else if (u < 0.75) {
-    // 주황-빨강
-    const t = (u - 0.5) / 0.25;
-    r = Math.floor(lerp(255, 220, t));
-    g = Math.floor(lerp(100, 50, t));
-    b = Math.floor(lerp(15, 10, t));
-  } else {
-    // 어두운 빨강/사라짐
-    const t = (u - 0.75) / 0.25;
-    r = Math.floor(lerp(220, 140, t));
-    g = Math.floor(lerp(50, 20, t));
-    b = Math.floor(lerp(10, 5, t));
-  }
-  
-  // 알파값도 조금 더 오래 유지
-  const a = lerp(0.95, 0.0, Math.pow(u, 0.9));
+  const r = 255;
+  const g = Math.floor(lerp(200, 20, Math.pow(u, 1.5)));
+  const b = Math.floor(lerp(50, 0, u));
+  const a = Math.pow(1 - u, 2) * 0.3;
   return `rgba(${r},${g},${b},${a})`;
 }
 
 function spawnFlame(x, y) {
-  const count = Math.floor(10 * effectiveIntensity); // intensity → effectiveIntensity
+  const count = Math.floor(8 * effectiveIntensity);
   for (let i = 0; i < count; i++) {
-    const life = rand(50, 80);
-    const angle = rand(-Math.PI/3, Math.PI/3); // 위쪽으로 발산
-    const speed = rand(1.6, 2.8) * effectiveIntensity; // intensity → effectiveIntensity
+    // 부스트 파동 적용 (1.0 ~ 1.5배)
+    const waveScale = 1.0 + fireBoostWave * 0.5;
     
     particles.push({
       type: "flame",
-      x: x + rand(-32, 32), // -16, 16 → -32, 32 (2배)
-      y: y + rand(-12, 12), // -6, 6 → -12, 12 (2배)
-      vx: Math.sin(angle) * speed * 0.2,
-      vy: -Math.cos(angle) * speed,
-      size: rand(28, 48), // 14, 24 → 28, 48 (2배)
-      life,
-      maxLife: life,
-      seed: Math.random() * 1000,
-      turbulence: rand(0.01, 0.03), // 난류 강도
-      depth: rand(0, 1), // 깊이감 (0: 뒤, 1: 앞)
+      x: x + rand(-60, 60) * FIRE_SCALE * waveScale,
+      y: y + rand(-15, 5),
+      vx: rand(-0.8, 0.8) * FIRE_SCALE * waveScale,
+      vy: rand(-4.0, -7.0) * effectiveIntensity * FIRE_SCALE * waveScale,
+      spriteIdx: Math.floor(Math.random() * sprites.length),
+      scale: rand(0.8, 2.2) * FIRE_SCALE * waveScale,
+      life: rand(40, 70),
+      maxLife: 70,
+      angle: rand(0, Math.PI * 2),
+      rotationSpeed: rand(-0.1, 0.1),
+      seed: Math.random() * 1000
     });
   }
 }
 
 function spawnCore(x, y) {
-  // 불의 가장 밝은 중심부 (원래대로 복원)
+  // 불의 가장 밝은 중심부
   const count = Math.floor(6 * effectiveIntensity);
   for (let i = 0; i < count; i++) {
-    const life = rand(15, 25);
+    const life = rand(18, 30);
+    // 부스트 파동 적용
+    const waveScale = 1.0 + fireBoostWave * 0.5;
+    
     particles.push({
       type: "core",
-      x: x + rand(-16, 16),
-      y: y + rand(-6, 6),
-      vx: rand(-0.1, 0.1),
-      vy: rand(-1.2, -0.8) * effectiveIntensity,
-      size: rand(16, 28),
+      x: x + rand(-30, 30) * FIRE_SCALE * waveScale,
+      y: y + rand(-8, 8),
+      vx: rand(-0.2, 0.2) * FIRE_SCALE * waveScale,
+      vy: rand(-2.0, -1.2) * effectiveIntensity * FIRE_SCALE * waveScale,
+      size: rand(18, 30) * FIRE_SCALE * waveScale,
       life,
       maxLife: life,
       seed: Math.random() * 1000,
@@ -222,18 +247,20 @@ function spawnCore(x, y) {
 }
 
 function spawnSpark(x, y) {
-  if (Math.random() > 0.12 * effectiveIntensity) return; // intensity → effectiveIntensity
+  if (Math.random() > 0.12 * effectiveIntensity) return;
   const life = rand(20, 40);
-  const angle = rand(-Math.PI/2.5, -Math.PI/4); // 비스듬히 위로
-  const speed = rand(3.0, 5.0);
+  const angle = rand(-Math.PI/2.5, -Math.PI/4);
+  const speed = rand(3.0, 5.0) * FIRE_SCALE;
+  // 부스트 파동으로 불똥도 더 많이
+  const waveScale = 1.0 + fireBoostWave * 0.8;
   
   particles.push({
     type: "spark",
-    x: x + rand(-20, 20), // -10, 10 → -20, 20 (2배)
-    y: y + rand(-12, 12), // -6, 6 → -12, 12 (2배)
-    vx: Math.sin(angle) * speed * 0.3,
-    vy: Math.cos(angle) * speed,
-    size: rand(3, 6), // 2, 4 → 3, 6 (1.5배)
+    x: x + rand(-20, 20) * FIRE_SCALE * waveScale,
+    y: y + rand(-12, 12),
+    vx: Math.sin(angle) * speed * 0.3 * waveScale,
+    vy: Math.cos(angle) * speed * waveScale,
+    size: rand(3, 6) * FIRE_SCALE * waveScale,
     life,
     maxLife: life,
     seed: Math.random() * 1000,
@@ -246,15 +273,15 @@ function spawnSmoke(x, y) {
   const life = rand(90, 140);
   particles.push({
     type: "smoke",
-    x: x + rand(-36, 36), // -18, 18 → -36, 36 (2배)
-    y: y + rand(-20, 0), // -10, 0 → -20, 0 (2배)
+    x: x + rand(-36, 36) * FIRE_SCALE,
+    y: y + rand(-20, 0),
     vx: rand(-0.2, 0.2),
     vy: rand(-0.7, -0.4),
-    size: rand(36, 64), // 18, 32 → 36, 64 (2배)
+    size: rand(36, 64) * FIRE_SCALE,
     life,
     maxLife: life,
     seed: Math.random() * 1000,
-    depth: rand(0, 0.5), // 연기는 뒤쪽에
+    depth: rand(0, 0.5),
   });
 }
 
@@ -262,14 +289,14 @@ function spawnEmber(x, y) {
   // 가끔 큰 불똥이 튐 (크랙링 사운드 시각화)
   if (Math.random() > 0.95) {
     const angle = rand(0, Math.PI * 2);
-    const speed = rand(4, 7);
+    const speed = rand(4, 7) * FIRE_SCALE;
     particles.push({
       type: "ember",
-      x: x + rand(-20, 20),
+      x: x + rand(-20, 20) * FIRE_SCALE,
       y: y,
       vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - 3,
-      size: rand(4, 8),
+      vy: Math.sin(angle) * speed - 3 * FIRE_SCALE,
+      size: rand(4, 8) * FIRE_SCALE,
       life: rand(40, 60),
       maxLife: 60,
       seed: Math.random() * 1000,
@@ -285,6 +312,29 @@ function spawnEmber(x, y) {
       pop.play()
     }
   }
+}
+
+// 여러 불꽃 무리 생성 (모닥불은 여러 곳에서 탐)
+function spawnMultiPointFlames(baseX, baseY) {
+  // 부스트 파동으로 발화점도 더 넓게
+  const waveScale = 1.0 + fireBoostWave * 0.6;
+  
+  const firePoints = [
+    { x: baseX - 70 * FIRE_SCALE * waveScale, y: baseY + 5, intensity: 0.7 },
+    { x: baseX - 35 * FIRE_SCALE * waveScale, y: baseY - 5, intensity: 0.9 },
+    { x: baseX, y: baseY - 10, intensity: 1.0 },
+    { x: baseX + 35 * FIRE_SCALE * waveScale, y: baseY - 5, intensity: 0.9 },
+    { x: baseX + 70 * FIRE_SCALE * waveScale, y: baseY + 5, intensity: 0.7 },
+  ];
+  
+  firePoints.forEach(point => {
+    if (Math.random() < point.intensity * 0.3) {
+      spawnFlame(point.x, point.y);
+    }
+    if (Math.random() < point.intensity * 0.25) {
+      spawnCore(point.x, point.y);
+    }
+  });
 }
 
 /* =========================
@@ -310,31 +360,6 @@ function drawGroundReflection(x, y, breathe) {
   ctx.fillStyle = g;
   ctx.beginPath();
   ctx.arc(x, y + 100, 200, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-function drawFlame(x, y, size, color, seed) {
-  // 원 대신 불규칙한 형태
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  
-  const points = 8;
-  for (let i = 0; i < points; i++) {
-    const angle = (i / points) * Math.PI * 2;
-    const noise = Math.sin(seed + i * 0.7) * 0.3 + 0.7; // 불규칙성
-    const offset = size * noise;
-    const stretchY = i < points / 2 ? 1.4 : 1.0; // 위쪽으로 늘림
-    const px = x + Math.cos(angle) * offset;
-    const py = y + Math.sin(angle) * offset * stretchY;
-    
-    if (i === 0) {
-      ctx.moveTo(px, py);
-    } else {
-      ctx.lineTo(px, py);
-    }
-  }
-  
-  ctx.closePath();
   ctx.fill();
 }
 
@@ -536,31 +561,41 @@ function update() {
   // intensity decay
   intensity = Math.max(1, intensity * 0.985);
   
+  // 부스트 파동 감쇠 (빠르게 사라짐)
+  if (fireBoostWave > 0) {
+    fireBoostWave = Math.max(0, fireBoostWave - 0.03); // 약 30프레임에 걸쳐 사라짐
+  }
+  
   // 불의 호흡 효과 (주기적으로 강해졌다 약해짐)
   const breathe = Math.sin(time * 0.01) * 0.3 + 1.0; // 0.7 ~ 1.3
-  const effectiveIntensity = intensity * breathe;
+  effectiveIntensity = intensity * breathe; // 전역 변수 업데이트
 
-  // glow (호흡에 따라 밝기 조절)
+  // glow (호흡에 따라 밝기 조절) - 부스트 파동으로 더 크게
   ctx.globalCompositeOperation = "source-over";
-  const glowIntensity = 0.5 * breathe; // 호흡 효과 반영
-  const g = ctx.createRadialGradient(baseX, baseY + 20, 40, baseX, baseY + 20, 440);
-  g.addColorStop(0, `rgba(255,180,90,${glowIntensity})`);
-  g.addColorStop(0.6, `rgba(255,140,60,${glowIntensity * 0.4})`);
+  const waveGlowScale = 1.0 + fireBoostWave * 0.5;
+  const glowIntensity = 0.5 * breathe * (1.0 + fireBoostWave * 0.4); // 파동 시 더 밝게
+  const g = ctx.createRadialGradient(
+    baseX, baseY + 20, 
+    60 * FIRE_SCALE * waveGlowScale, 
+    baseX, baseY + 20, 
+    600 * FIRE_SCALE * waveGlowScale
+  );
+  g.addColorStop(0, `rgba(255,180,90,${glowIntensity * 0.8})`);
+  g.addColorStop(0.6, `rgba(255,140,60,${glowIntensity * 0.5})`);
   g.addColorStop(1, "rgba(10,15,30,0)");
   ctx.fillStyle = g;
   ctx.beginPath();
-  ctx.arc(baseX, baseY + 20, 440, 0, Math.PI * 2);
+  ctx.arc(baseX, baseY + 20, 600 * FIRE_SCALE * waveGlowScale, 0, Math.PI * 2);
   ctx.fill();
   
-  // 바닥 반사광 추가
-  drawGroundReflection(baseX, baseY, breathe);
+  // 바닥 반사광 추가 (부스트 파동 반영)
+  drawGroundReflection(baseX, baseY, breathe * (1.0 + fireBoostWave * 0.5));
 
   // logs (장작만 먼저 그림)
   drawLogs(baseX, baseY);
 
-  // spawn
-  spawnFlame(baseX, baseY);
-  spawnCore(baseX, baseY);
+  // spawn - 다중 지점에서 불꽃 생성 (모닥불 느낌)
+  spawnMultiPointFlames(baseX, baseY);
   spawnSpark(baseX, baseY);
   spawnSmoke(baseX, baseY);
   spawnEmber(baseX, baseY); // 불똥 추가
@@ -587,15 +622,15 @@ function update() {
       p.x += p.vx;
       p.y += p.vy;
       
-      // 훨씬 더 어두운 색상 + 낮은 알파 (10개 겹쳐도 하얗게 안 됨)
+      // core 개수가 늘어났으므로 알파값을 더 낮춤
       const depthScale = 0.7 + (p.depth || 0.5) * 0.3;
       const r = p.size * (1 - u * 0.5) * depthScale;
       const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
-      // R값 180 이하 + 알파 0.5 이하
-      grad.addColorStop(0, `rgba(180, 120, 25, ${0.45 * (1-u)})`);   // 어두운 주황
-      grad.addColorStop(0.4, `rgba(170, 90, 20, ${0.35 * (1-u)})`);  // 진한 주황
-      grad.addColorStop(0.7, `rgba(160, 60, 15, ${0.25 * (1-u)})`);  // 주황-빨강
-      grad.addColorStop(1, `rgba(140, 40, 10, 0)`);                   // 빨강으로 페이드
+      // 알파값을 더 낮춰서 겹쳐도 하얗게 안 됨
+      grad.addColorStop(0, `rgba(180, 120, 25, ${0.25 * (1-u)})`);   // 0.45 → 0.25
+      grad.addColorStop(0.4, `rgba(170, 90, 20, ${0.20 * (1-u)})`);  // 0.35 → 0.20
+      grad.addColorStop(0.7, `rgba(160, 60, 15, ${0.15 * (1-u)})`);  // 0.25 → 0.15
+      grad.addColorStop(1, `rgba(140, 40, 10, 0)`);
       ctx.fillStyle = grad;
       ctx.beginPath();
       ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
@@ -603,23 +638,42 @@ function update() {
     }
 
     if (p.type === "flame") {
-      p.vx += wobble * 0.02 + wind.x * 0.02;
-      p.vy += wind.y * 0.01;
-      p.vx *= 0.98;
-      p.vy *= 0.995;
-      
-      // 난류 효과
-      if (p.turbulence) {
-        p.vx += (Math.random() - 0.5) * p.turbulence;
-      }
-      
-      p.x += p.vx;
-      p.y += p.vy;
+  // 더 강한 난류(Turbulence) 효과: 불규칙한 움직임 추가
+  const noise = Math.sin(time * 0.08 + p.seed) * Math.cos(time * 0.1 + p.seed);
+  p.vx += noise * 0.15; // 더 강한 난류
+  
+  // 바람 영향 추가
+  p.vx += wind.x * 0.1;
+  p.vy += wind.y * 0.06;
+  
+  p.x += p.vx;
+  p.y += p.vy;
+  
+  // 위로 올라갈수록 좌우로 더 흔들림 + 가속 (모닥불 특징)
+  const heightFactor = Math.max(0, (baseY - p.y) / 150);
+  p.vx += (Math.random() - 0.5) * 0.4 * heightFactor;
+  p.vy -= 0.02 * heightFactor; // 위로 갈수록 더 빠르게
+  
+  // 회전 적용 (위로 갈수록 더 빠르게 회전)
+  p.angle += p.rotationSpeed * (1 + heightFactor * 0.5);
 
-      const depthScale = 0.7 + (p.depth || 0.5) * 0.3;
-      const r = p.size * (1 - u * 0.7) * depthScale;
-      drawFlame(p.x, p.y, r, fireColor(u), p.seed);
-    }
+  const sprite = sprites[p.spriteIdx];
+  const drawSize = sprite.size * p.scale * (1 - u * 0.4); // 크기 감소
+
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(p.angle);
+  ctx.globalAlpha = Math.pow(1 - u, 0.8) * 0.85; // 페이드 아웃 커브 조정
+
+  // 스프라이트 그리기
+  ctx.drawImage(
+    spriteCanvas, 
+    sprite.x, sprite.y, sprite.size, sprite.size,
+    -drawSize/2, -drawSize/2, drawSize, drawSize
+  );
+  
+  ctx.restore();
+}
 
     if (p.type === "spark") {
       p.vy += 0.1;
@@ -677,8 +731,8 @@ function update() {
     }
   }
 
-  if (particles.length > 1200) { // 600 → 1200 (2배)
-    particles.splice(0, particles.length - 1200);
+  if (particles.length > 1000) { // 1500 → 1000 (파티클 개수 조절)
+    particles.splice(0, particles.length - 1000);
   }
 
   // 돌들을 마지막에 그려서 앞에 보이도록 (불 파티클 위에)
@@ -691,19 +745,65 @@ function update() {
 update();
 
 /* =========================
-   Interaction (Boost)
+   Interaction (Fire Boost Wave)
 ========================= */
-window.addEventListener("click", () => {
-  intensity = Math.min(intensity + 1.6, 3.5);
+function isNearFire(x, y) {
+  const baseX = innerWidth * 0.5;
+  const baseY = innerHeight * 0.72;
   
-  // 클릭 시 사운드 볼륨 일시적으로 증가
+  // 불 영역 판정 (타원형)
+  const horizontalRadius = 200 * FIRE_SCALE; // 가로 반경
+  const verticalRadius = 300 * FIRE_SCALE;   // 세로 반경 (위로 길게)
+  
+  const dx = (x - baseX) / horizontalRadius;
+  const dy = (y - baseY) / verticalRadius;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  
+  return distance < 1.0; // 타원 영역 내부
+}
+
+function boostFire() {
+  // 불꽃 파동 효과 시작
+  fireBoostWave = 1.0;
+  
+  // 전역 intensity 일시 증가
+  intensity = Math.min(intensity + 1.2, 3.0);
+  
+  // 사운드 효과
   if (soundEnabled && fireLoop) {
-    fireLoop.volume = Math.min(0.6, fireLoop.volume + 0.2);
+    fireLoop.volume = Math.min(0.7, fireLoop.volume + 0.25);
     setTimeout(() => {
-      fireLoop.volume = 0.4;
-    }, 2000);
+      fireLoop.volume = 0.5;
+    }, 1500);
+  }
+  
+  // 팝 사운드
+  if (soundEnabled && Math.random() > 0.3) {
+    const pop = firePopSound.cloneNode ? firePopSound.cloneNode() : firePopSound;
+    pop.volume = 0.4;
+    pop.currentTime = Math.random() * 15;
+    pop.play().catch(() => {});
+  }
+}
+
+// 마우스 클릭
+window.addEventListener("click", (e) => {
+  if (isNearFire(e.clientX, e.clientY)) {
+    boostFire();
   }
 });
+
+// 터치 이벤트 (모바일)
+window.addEventListener("touchstart", (e) => {
+  e.preventDefault();
+  for (let i = 0; i < e.touches.length; i++) {
+    const touch = e.touches[i];
+    if (isNearFire(touch.clientX, touch.clientY)) {
+      boostFire();
+      break; // 첫 번째 터치만 처리
+    }
+  }
+}, { passive: false });
 </script>
 </body>
 </html>
